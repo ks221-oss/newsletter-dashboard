@@ -1,15 +1,19 @@
-import React from "react";
+import React, { useState } from "react";
 import { useGetDashboardRuns, getGetDashboardRunsQueryKey } from "@workspace/api-client-react";
 import DailyCharts from "@/components/dashboard/daily-charts";
 import Timeline from "@/components/dashboard/timeline";
 import SidePane from "@/components/dashboard/side-pane";
 import ChannelManager from "@/components/dashboard/channel-manager";
 import SidePaneLogs from "@/components/dashboard/side-pane-logs";
-import { AlertCircle, RefreshCw } from "lucide-react";
+import { AlertCircle, RefreshCw, Youtube, List } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 
+type MobileTab = "accounts" | "logs";
+
 export default function Dashboard() {
+  const [mobileTab, setMobileTab] = useState<MobileTab>("accounts");
+
   const {
     data: runsData,
     isLoading: isRunsLoading,
@@ -87,20 +91,37 @@ export default function Dashboard() {
           </>
         )}
 
-        {/* ── Mobile: pane sections stacked below main content ── */}
-        <div className="md:hidden border-t border-border pt-6 space-y-6">
-          <div className="space-y-3">
-            <h2 className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase pb-1 border-b border-border">
+        {/* ── Mobile: tabbed pane below main content ── */}
+        <div className="md:hidden border-t border-border pt-4 space-y-4">
+          {/* Tab bar */}
+          <div className="flex border border-border">
+            <button
+              onClick={() => setMobileTab("accounts")}
+              className={`flex items-center gap-1.5 flex-1 justify-center px-4 py-2.5 text-[10px] font-mono uppercase tracking-widest transition-colors ${
+                mobileTab === "accounts"
+                  ? "text-primary bg-primary/5"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/30"
+              }`}
+            >
+              <Youtube className="w-3 h-3" />
               Accounts Tracked
-            </h2>
-            <ChannelManager />
-          </div>
-          <div className="space-y-3">
-            <h2 className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase pb-1 border-b border-border">
+            </button>
+            <button
+              onClick={() => setMobileTab("logs")}
+              className={`flex items-center gap-1.5 flex-1 justify-center px-4 py-2.5 text-[10px] font-mono uppercase tracking-widest border-l border-border transition-colors ${
+                mobileTab === "logs"
+                  ? "text-primary bg-primary/5"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/30"
+              }`}
+            >
+              <List className="w-3 h-3" />
               Logs
-            </h2>
-            <SidePaneLogs runsData={runsData} />
+            </button>
           </div>
+
+          {/* Tab content */}
+          {mobileTab === "accounts" && <ChannelManager />}
+          {mobileTab === "logs" && <SidePaneLogs runsData={runsData} />}
         </div>
       </div>
     </div>

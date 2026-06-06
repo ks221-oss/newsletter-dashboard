@@ -136,8 +136,10 @@ function ChannelRow({
             <div className="font-mono text-xs text-foreground truncate leading-tight">
               {ch.displayName}
             </div>
-            <div className="font-mono text-[10px] text-muted-foreground leading-tight">
-              {ch.youtubeHandle}
+            <div className="font-mono text-[10px] text-muted-foreground leading-tight flex items-center gap-1.5">
+              <span className="truncate">{ch.youtubeHandle}</span>
+              <span className="opacity-40">·</span>
+              <span className="shrink-0 opacity-60">{formatDate(ch.createdAt)}</span>
             </div>
           </div>
         </div>
