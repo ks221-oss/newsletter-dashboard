@@ -1,5 +1,8 @@
 import React from "react";
-import { Youtube, List, ChevronLeft, ChevronRight } from "lucide-react";
+import { Youtube, List, BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
+
+const NOTION_URL =
+  "https://app.notion.com/p/ks221/3778d67d1a808030834fd3d08f41b05e?v=3778d67d1a80800eb016000c4288ba59";
 
 export type NavView = "accounts" | "logs";
 
@@ -63,6 +66,16 @@ export default function NavRail({
           <List className="w-3.5 h-3.5" />
         </button>
 
+        <a
+          href={NOTION_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center h-10 w-full border-b border-border/60 text-muted-foreground hover:text-primary hover:bg-primary/5 border-l-2 border-l-transparent transition-colors"
+          title="Podcast Digest History"
+        >
+          <BookOpen className="w-3.5 h-3.5" />
+        </a>
+
         <div className="flex-1 flex items-center justify-center overflow-hidden">
           <span
             className="text-[7px] font-mono text-muted-foreground/25 uppercase tracking-[0.3em] select-none whitespace-nowrap"
@@ -123,6 +136,18 @@ export default function NavRail({
             )}
           </button>
         ))}
+
+        <a
+          href={NOTION_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 pl-3 pr-2 py-2.5 text-left transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/30 border-l-2 border-transparent"
+        >
+          <BookOpen className="w-3.5 h-3.5 shrink-0" />
+          <span className="text-[10px] font-mono uppercase tracking-wider leading-tight flex-1">
+            Podcast Digest History
+          </span>
+        </a>
       </nav>
     </aside>
   );
