@@ -488,13 +488,17 @@ export default function ChannelGrid() {
 
   function handleAdd(e: React.FormEvent) {
     e.preventDefault();
-    const handle = parseYouTubeInput(urlInput);
-    if (!handle || !effectiveName) return;
-    const exists = channels?.some((ch) => ch.youtubeHandle.toLowerCase() === handle.toLowerCase());
-    if (exists) { setAddState({ kind: "duplicate", handle }); return; }
-    pendingHandleRef.current = handle;
+    // Use the canonical handle resolved by validation (UC... channel ID for @handle inputs);
+    // fall back to raw parsed handle only as a safety guard (canSubmit requires validation).
+    const canonicalHandle = validation?.youtubeHandle ?? parseYouTubeInput(urlInput);
+    if (!canonicalHandle || !effectiveName) return;
+    const exists = channels?.some(
+      (ch) => ch.youtubeHandle.toLowerCase() === canonicalHandle.toLowerCase(),
+    );
+    if (exists) { setAddState({ kind: "duplicate", handle: canonicalHandle }); return; }
+    pendingHandleRef.current = canonicalHandle;
     setAddState({ kind: "adding" });
-    createChannel({ data: { displayName: effectiveName, youtubeHandle: handle } });
+    createChannel({ data: { displayName: effectiveName, youtubeHandle: canonicalHandle } });
   }
 
   function handleClearInput() {
@@ -506,9 +510,14 @@ export default function ChannelGrid() {
     userEditedNameRef.current = false;
   }
 
+  // Use the canonical handle (resolved by validation) for duplicate detection so that
+  // @handle and UC... formats for the same channel don't bypass the check.
+  const canonicalHandleForDupe = validation?.youtubeHandle ?? parsedHandle;
   const isDuplicateInline =
-    !!parsedHandle &&
-    !!channels?.some((ch) => ch.youtubeHandle.toLowerCase() === parsedHandle.toLowerCase());
+    !!canonicalHandleForDupe &&
+    !!channels?.some(
+      (ch) => ch.youtubeHandle.toLowerCase() === canonicalHandleForDupe.toLowerCase(),
+    );
 
   // Still waiting for the debounce timer to fire
   const isDebouncing = !!parsedHandle && parsedHandle !== debouncedHandle;
