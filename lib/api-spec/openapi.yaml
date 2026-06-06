@@ -3,13 +3,15 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Newsletter Dashboard API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: dashboard
+    description: Newsletter dashboard operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,68 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /dashboard/runs:
+    get:
+      operationId: getDashboardRuns
+      tags: [dashboard]
+      summary: Get all newsletter runs
+      description: Fetches run data from the VPS and returns it keyed by date
+      responses:
+        "200":
+          description: Run data keyed by date
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunsData"
+        "502":
+          description: Unable to reach VPS
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /dashboard/gmail/{date}:
+    get:
+      operationId: getGmailStatus
+      tags: [dashboard]
+      summary: Check Gmail for a date
+      description: Checks Gmail INBOX and Spam for an AI Podcast Digest email on a given date
+      parameters:
+        - name: date
+          in: path
+          required: true
+          schema:
+            type: string
+            description: ISO date string (YYYY-MM-DD)
+      responses:
+        "200":
+          description: Gmail check result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GmailStatus"
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get dashboard summary stats
+      description: Returns high-level stats about newsletter runs
+      responses:
+        "200":
+          description: Summary statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+        "502":
+          description: Unable to reach VPS
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +98,90 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    VideoRecord:
+      type: object
+      properties:
+        title:
+          type: string
+        url:
+          type: string
+        channel:
+          type: string
+        transcript:
+          type: ["string", "null"]
+        transcript_error:
+          type: ["string", "null"]
+      required:
+        - title
+        - url
+        - channel
+        - transcript
+
+    RunRecord:
+      type: object
+      properties:
+        total_videos:
+          type: integer
+        email_sent:
+          type: boolean
+        videos:
+          type: array
+          items:
+            $ref: "#/components/schemas/VideoRecord"
+      required:
+        - total_videos
+        - email_sent
+        - videos
+
+    RunsData:
+      type: object
+      description: Map of ISO date strings to arrays of RunRecord
+      additionalProperties:
+        type: array
+        items:
+          $ref: "#/components/schemas/RunRecord"
+
+    GmailStatus:
+      type: object
+      properties:
+        date:
+          type: string
+        found:
+          type: ["boolean", "null"]
+          description: true if email found, false if not found, null if Gmail check failed
+        unavailable:
+          type: boolean
+          description: true if Gmail credentials are not configured
+      required:
+        - date
+        - found
+        - unavailable
+
+    DashboardSummary:
+      type: object
+      properties:
+        totalRuns:
+          type: integer
+        last30DaysRuns:
+          type: integer
+        last30DaysEmailsSent:
+          type: integer
+        last30DaysTranscriptRate:
+          type: number
+          description: Fraction of videos successfully transcribed in last 30 days (0-1)
+        totalVideosProcessed:
+          type: integer
+      required:
+        - totalRuns
+        - last30DaysRuns
+        - last30DaysEmailsSent
+        - last30DaysTranscriptRate
+        - totalVideosProcessed

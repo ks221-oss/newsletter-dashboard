@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Newsletter Dashboard"
+version = "1.0.0"
+id = "artifacts/newsletter-dashboard"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24652
+
+[services.development]
+run = "pnpm --filter @workspace/newsletter-dashboard run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/newsletter-dashboard", "run", "build" ]
+publicDir = "artifacts/newsletter-dashboard/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24652"
+BASE_PATH = "/"
