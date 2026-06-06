@@ -8,9 +8,33 @@ import {
 } from "@workspace/api-client-react";
 import { TrackedChannel } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Youtube, Loader2, AlertCircle, Pencil, Check, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Trash2, Youtube, Loader2, AlertCircle, Pencil, Check, X, ChevronUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+
+function parseYouTubeInput(raw: string): string {
+  const trimmed = raw.trim();
+  try {
+    const url = new URL(trimmed);
+    if (url.hostname === "www.youtube.com" || url.hostname === "youtube.com") {
+      if (url.pathname.startsWith("/@")) return url.pathname.slice(1);
+      if (url.pathname.startsWith("/channel/")) return url.pathname.slice("/channel/".length);
+      if (url.pathname.startsWith("/c/")) return "@" + url.pathname.slice("/c/".length);
+      if (url.pathname.startsWith("/user/")) return "@" + url.pathname.slice("/user/".length);
+    }
+  } catch {
+    // not a URL
+  }
+  return trimmed;
+}
+
+function suggestDisplayName(handle: string): string {
+  const base = handle.replace(/^@/, "").replace(/[-_]/g, " ");
+  return base
+    .split(" ")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
 
 function formatDate(dateStr: string | Date) {
   const d = new Date(dateStr);
@@ -151,10 +175,9 @@ function ChannelRow({ ch, onDelete, isDeleting }: { ch: TrackedChannel; onDelete
 
 export default function ChannelManager() {
   const queryClient = useQueryClient();
+  const [urlInput, setUrlInput] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [youtubeHandle, setYoutubeHandle] = useState("");
-  const [scraperName, setScraperName] = useState("");
-  const [showScraperField, setShowScraperField] = useState(false);
+  const [nameTouched, setNameTouched] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
 
   const { data: channels, isLoading } = useGetChannels({
@@ -165,10 +188,9 @@ export default function ChannelManager() {
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetChannelsQueryKey() });
+        setUrlInput("");
         setDisplayName("");
-        setYoutubeHandle("");
-        setScraperName("");
-        setShowScraperField(false);
+        setNameTouched(false);
         setAddError(null);
       },
       onError: (err: unknown) => {
@@ -186,81 +208,59 @@ export default function ChannelManager() {
     },
   });
 
-  function handleAdd(e: React.FormEvent) {
-    e.preventDefault();
-    if (!displayName.trim() || !youtubeHandle.trim()) return;
-    setAddError(null);
-    createChannel({
-      data: {
-        displayName: displayName.trim(),
-        youtubeHandle: youtubeHandle.trim(),
-        scraperName: scraperName.trim() || null,
-      },
-    });
+  function handleUrlChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const val = e.target.value;
+    setUrlInput(val);
+    if (!nameTouched) {
+      const parsed = parseYouTubeInput(val);
+      if (parsed) setDisplayName(suggestDisplayName(parsed));
+      else setDisplayName("");
+    }
   }
 
+  function handleAdd(e: React.FormEvent) {
+    e.preventDefault();
+    const handle = parseYouTubeInput(urlInput);
+    if (!handle || !displayName.trim()) return;
+    setAddError(null);
+    createChannel({ data: { displayName: displayName.trim(), youtubeHandle: handle } });
+  }
+
+  const parsedHandle = parseYouTubeInput(urlInput);
+  const canSubmit = !!parsedHandle && !!displayName.trim() && !isCreating;
+
   return (
-    <div className="bg-card border border-border p-4 space-y-4">
-      {/* Add form */}
+    <div className="space-y-3">
       <form onSubmit={handleAdd} className="space-y-2">
-        <div className="flex flex-col sm:flex-row gap-2">
-          <input
-            type="text"
-            placeholder="Display name (e.g. Lex Fridman)"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            className="flex-1 bg-background border border-border px-3 py-1.5 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary rounded-none"
-            disabled={isCreating}
-          />
-          <input
-            type="text"
-            placeholder="YouTube handle (e.g. @lexfridman)"
-            value={youtubeHandle}
-            onChange={(e) => setYoutubeHandle(e.target.value)}
-            className="flex-1 bg-background border border-border px-3 py-1.5 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary rounded-none"
-            disabled={isCreating}
-          />
-          <button
-            type="submit"
-            disabled={isCreating || !displayName.trim() || !youtubeHandle.trim()}
-            className="flex items-center gap-2 px-4 py-1.5 bg-primary text-primary-foreground text-xs font-mono uppercase tracking-wider hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed rounded-none"
-          >
-            {isCreating ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Plus className="w-3.5 h-3.5" />
-            )}
-            Add Channel
-          </button>
-        </div>
-
-        {/* Optional scraper name toggle */}
-        <div>
-          <button
-            type="button"
-            onClick={() => setShowScraperField((v) => !v)}
-            className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground hover:text-foreground transition-colors uppercase tracking-wider"
-          >
-            {showScraperField ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-            {showScraperField ? "Hide" : "Set scraper name (optional)"}
-          </button>
-
-          {showScraperField && (
-            <div className="mt-2 space-y-1">
-              <input
-                type="text"
-                placeholder="Exact name your VPS scraper reports (e.g. Lex Fridman Podcast)"
-                value={scraperName}
-                onChange={(e) => setScraperName(e.target.value)}
-                className="w-full bg-background border border-border px-3 py-1.5 text-[12px] font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/60 rounded-none border-dashed"
-                disabled={isCreating}
-              />
-              <p className="text-[10px] font-mono text-muted-foreground opacity-60">
-                Used to match this channel in the telemetry log. Check the channel breakdown in any day row to see what your scraper reports.
-              </p>
-            </div>
-          )}
-        </div>
+        <input
+          type="text"
+          placeholder="YouTube URL or @handle"
+          value={urlInput}
+          onChange={handleUrlChange}
+          className="w-full bg-background border border-border px-3 py-1.5 text-[12px] font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary rounded-none"
+          disabled={isCreating}
+        />
+        {parsedHandle && parsedHandle !== urlInput.trim() && (
+          <div className="text-[10px] font-mono text-muted-foreground px-1">
+            → <span className="text-primary">{parsedHandle}</span>
+          </div>
+        )}
+        <input
+          type="text"
+          placeholder="Display name"
+          value={displayName}
+          onChange={(e) => { setDisplayName(e.target.value); setNameTouched(true); }}
+          className="w-full bg-background border border-border px-3 py-1.5 text-[12px] font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary rounded-none"
+          disabled={isCreating}
+        />
+        <button
+          type="submit"
+          disabled={!canSubmit}
+          className="w-full flex items-center justify-center gap-2 px-4 py-1.5 bg-primary text-primary-foreground text-xs font-mono uppercase tracking-wider hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed rounded-none"
+        >
+          {isCreating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+          Add Channel
+        </button>
       </form>
 
       {addError && (
@@ -270,18 +270,17 @@ export default function ChannelManager() {
         </div>
       )}
 
-      {/* Channel list */}
       {isLoading ? (
-        <div className="space-y-2">
-          <Skeleton className="h-10 w-full bg-muted" />
-          <Skeleton className="h-10 w-full bg-muted" />
+        <div className="space-y-1.5">
+          <Skeleton className="h-9 w-full bg-muted" />
+          <Skeleton className="h-9 w-full bg-muted" />
         </div>
       ) : !channels || channels.length === 0 ? (
-        <div className="py-6 text-center text-[11px] font-mono text-muted-foreground uppercase tracking-wider border border-dashed border-border">
-          No channels tracked yet — add one above
+        <div className="py-4 text-center text-[11px] font-mono text-muted-foreground uppercase tracking-wider border border-dashed border-border">
+          No channels yet
         </div>
       ) : (
-        <div className="space-y-1">
+        <div className="space-y-px">
           {channels.map((ch) => (
             <ChannelRow
               key={ch.id}
@@ -290,15 +289,12 @@ export default function ChannelManager() {
               isDeleting={isDeleting}
             />
           ))}
-        </div>
-      )}
-
-      {channels && channels.length > 0 && (
-        <div className="text-[10px] font-mono text-muted-foreground pt-1 opacity-60">
-          <span className="text-amber-400">NO_MAP</span> = scraper name not set, channel won&apos;t appear in day-row breakdown.{" "}
-          <span className="text-emerald-400">MAPPED</span> = matched to telemetry data.
-          {" "}Your VPS can fetch tracked channels via{" "}
-          <code className="text-primary">GET /api/channels</code>.
+          <div className="text-[10px] font-mono text-muted-foreground pt-1 opacity-60">
+            <span className="text-amber-400">NO_MAP</span> = scraper name not set.{" "}
+            <span className="text-emerald-400">MAPPED</span> = matched to telemetry.
+            {" "}VPS reads via{" "}
+            <code className="text-primary">GET /api/channels</code>.
+          </div>
         </div>
       )}
     </div>
