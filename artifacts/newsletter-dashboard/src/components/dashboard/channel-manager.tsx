@@ -1,10 +1,14 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   useGetChannels,
   useCreateChannel,
   useUpdateChannel,
   useDeleteChannel,
+  useGetDashboardRuns,
   getGetChannelsQueryKey,
+  getGetDashboardRunsQueryKey,
+  RunsData,
+  VideoRecord,
 } from "@workspace/api-client-react";
 import { TrackedChannel } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -93,10 +97,16 @@ function ChannelRow({
   ch,
   onDelete,
   isDeleting,
+  knownScraperNames,
+  mappedScraperNames,
+  lastSeenMap,
 }: {
   ch: TrackedChannel;
   onDelete: (id: number) => void;
   isDeleting: boolean;
+  knownScraperNames: string[];
+  mappedScraperNames: Set<string>;
+  lastSeenMap: Map<string, string>;
 }) {
   const queryClient = useQueryClient();
   const [editingScraperName, setEditingScraperName] = useState(false);
@@ -104,6 +114,16 @@ function ChannelRow({
     ch.scraperName ?? "",
   );
   const [editError, setEditError] = useState<string | null>(null);
+
+  const suggestions = useMemo(() => {
+    if (!editingScraperName || knownScraperNames.length === 0) return [];
+    const q = scraperNameInput.toLowerCase();
+    // Exact match → no suggestions needed
+    if (knownScraperNames.some((n) => n.toLowerCase() === q)) return [];
+    return knownScraperNames
+      .filter((n) => !q || n.toLowerCase().includes(q))
+      .slice(0, 6);
+  }, [editingScraperName, scraperNameInput, knownScraperNames]);
 
   const { mutate: updateChannel, isPending: isUpdating } = useUpdateChannel({
     mutation: {
@@ -144,17 +164,35 @@ function ChannelRow({
           </div>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          {ch.scraperName ? (
+          {ch.scraperName ? (() => {
+            const lastSeen = lastSeenMap.get(ch.scraperName);
+            if (lastSeen) {
+              const d = new Date(lastSeen + "T00:00:00Z");
+              const label = d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+              return (
+                <Badge
+                  variant="outline"
+                  className="rounded-none font-mono text-[9px] border-emerald-500/40 text-emerald-400 bg-emerald-500/10 px-1 py-0 gap-1"
+                  title={`Last seen in telemetry: ${lastSeen}`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-pulse" />
+                  {label}
+                </Badge>
+              );
+            }
+            return (
+              <Badge
+                variant="outline"
+                className="rounded-none font-mono text-[9px] border-amber-500/30 text-amber-400 bg-amber-500/10 px-1 py-0"
+                title="Scraper name set but not yet seen in telemetry"
+              >
+                UNSEEN
+              </Badge>
+            );
+          })() : (
             <Badge
               variant="outline"
-              className="rounded-none font-mono text-[9px] border-emerald-500/30 text-emerald-400 bg-emerald-500/10 px-1 py-0"
-            >
-              MAPPED
-            </Badge>
-          ) : (
-            <Badge
-              variant="outline"
-              className="rounded-none font-mono text-[9px] border-amber-500/30 text-amber-400 bg-amber-500/10 px-1 py-0"
+              className="rounded-none font-mono text-[9px] border-border/40 text-muted-foreground bg-muted/10 px-1 py-0"
             >
               NO_MAP
             </Badge>
@@ -220,6 +258,45 @@ function ChannelRow({
               <X className="w-3 h-3" />
             </button>
           </div>
+
+          {/* ── Suggestions from live telemetry ── */}
+          {suggestions.length > 0 && (
+            <div className="space-y-1">
+              <div className="text-[9px] font-mono text-muted-foreground uppercase tracking-widest opacity-60">
+                Seen in telemetry — click to use
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {suggestions.map((name) => {
+                  const inUse = mappedScraperNames.has(name) && name !== ch.scraperName;
+                  return (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => setScraperNameInput(name)}
+                      disabled={isUpdating}
+                      title={inUse ? "Already mapped to another channel" : undefined}
+                      className={`px-2 py-0.5 border text-[10px] font-mono transition-colors rounded-none ${
+                        inUse
+                          ? "border-border/40 text-muted-foreground/40 cursor-default"
+                          : "border-primary/30 text-primary bg-primary/5 hover:bg-primary/15"
+                      }`}
+                    >
+                      {name}
+                      {inUse && <span className="ml-1 opacity-50">·used</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* No telemetry available yet */}
+          {knownScraperNames.length === 0 && (
+            <div className="text-[10px] font-mono text-muted-foreground opacity-40">
+              No telemetry seen yet — type the exact string your VPS reports
+            </div>
+          )}
+
           {editError && (
             <div className="flex items-center gap-1.5 text-[11px] font-mono text-red-400">
               <AlertCircle className="w-3 h-3" />
@@ -265,6 +342,53 @@ export default function ChannelManager() {
   const { data: channels, isLoading } = useGetChannels({
     query: { queryKey: getGetChannelsQueryKey() },
   });
+
+  // Pull cached run telemetry (no extra fetch — already in TanStack Query cache)
+  const { data: runsData } = useGetDashboardRuns({
+    query: { queryKey: getGetDashboardRunsQueryKey() },
+  });
+
+  // All unique channel name strings seen across every run's video list
+  const knownScraperNames = useMemo<string[]>(() => {
+    if (!runsData) return [];
+    const seen = new Set<string>();
+    for (const runs of Object.values(runsData as RunsData)) {
+      for (const run of runs) {
+        for (const v of run.videos as VideoRecord[]) {
+          if (v.channel) seen.add(v.channel);
+        }
+      }
+    }
+    return Array.from(seen).sort((a, b) => a.localeCompare(b));
+  }, [runsData]);
+
+  // Names already claimed by another channel — used to dim suggestion chips
+  const mappedScraperNames = useMemo<Set<string>>(() => {
+    const s = new Set<string>();
+    for (const ch of channels ?? []) {
+      if (ch.scraperName) s.add(ch.scraperName);
+    }
+    return s;
+  }, [channels]);
+
+  // Most recent date each scraper-name string was seen in telemetry
+  const lastSeenMap = useMemo<Map<string, string>>(() => {
+    if (!runsData) return new Map();
+    const map = new Map<string, string>();
+    // Sort dates descending so first occurrence = most recent
+    const sortedDates = Object.keys(runsData as RunsData).sort((a, b) => b.localeCompare(a));
+    for (const date of sortedDates) {
+      const runs = (runsData as RunsData)[date];
+      for (const run of runs) {
+        for (const v of run.videos as VideoRecord[]) {
+          if (v.channel && !map.has(v.channel)) {
+            map.set(v.channel, date);
+          }
+        }
+      }
+    }
+    return map;
+  }, [runsData]);
 
   const { mutate: createChannel } = useCreateChannel({
     mutation: {
@@ -526,6 +650,9 @@ export default function ChannelManager() {
               ch={ch}
               onDelete={(id) => deleteChannel({ id })}
               isDeleting={isDeleting}
+              knownScraperNames={knownScraperNames}
+              mappedScraperNames={mappedScraperNames}
+              lastSeenMap={lastSeenMap}
             />
           ))}
           <div className="text-[10px] font-mono text-muted-foreground pt-1 opacity-60">
