@@ -5,9 +5,15 @@ import { CreateChannelBody, DeleteChannelParams, UpdateChannelBody } from "@work
 
 const router: IRouter = Router();
 
-// ─── YouTube RSS helpers ──────────────────────────────────────────────────────
+// ─── YouTube helpers ──────────────────────────────────────────────────────────
 
 const CHANNEL_ID_RE = /^UC[\w-]{22}$/;
+
+const YT_HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Accept-Language": "en-US,en;q=0.9",
+};
 
 function decodeHtmlEntities(str: string): string {
   return str
@@ -19,11 +25,57 @@ function decodeHtmlEntities(str: string): string {
     .replace(/&apos;/g, "'");
 }
 
+/** Fetch a YouTube page and extract the UC channel ID using several known patterns. */
+async function resolveHandleToChannelId(ytHandle: string): Promise<{
+  channelId: string | null;
+  avatarUrl: string | null;
+  description: string | null;
+}> {
+  const handle = ytHandle.startsWith("@") ? ytHandle : `@${ytHandle}`;
+  const pageRes = await fetch(`https://www.youtube.com/${handle}`, {
+    headers: YT_HEADERS,
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!pageRes.ok) return { channelId: null, avatarUrl: null, description: null };
+  const html = await pageRes.text();
+
+  const idMatch =
+    html.match(/"channelId":"(UC[\w-]{22})"/) ||
+    html.match(/"externalChannelId":"(UC[\w-]{22})"/) ||
+    html.match(/\/channel\/(UC[\w-]{22})/) ||
+    html.match(/"ucid":"(UC[\w-]{22})"/);
+
+  const avatarMatch = html.match(/<meta property="og:image"\s+content="([^"]+)"/);
+  const descMatch = html.match(/<meta property="og:description"\s+content="([^"]+)"/);
+
+  return {
+    channelId: idMatch ? idMatch[1] : null,
+    avatarUrl: avatarMatch ? avatarMatch[1] : null,
+    description: descMatch ? decodeHtmlEntities(descMatch[1]) : null,
+  };
+}
+
+/** Fetch a YouTube channel page by UC ID and extract the @handle. */
+async function resolveChannelIdToHandle(channelId: string): Promise<string | null> {
+  const pageRes = await fetch(`https://www.youtube.com/channel/${channelId}`, {
+    headers: YT_HEADERS,
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!pageRes.ok) return null;
+  const html = await pageRes.text();
+  // YouTube embeds the @handle in double-quoted strings in the page JSON
+  const matches = html.match(/"(@[A-Za-z0-9_-]{3,30})"/g);
+  if (!matches) return null;
+  // Filter out generic YouTube handles and pick the first real one
+  const skip = new Set(['"@youtube"', '"@YouTube"', '"@YouTubeIndia"']);
+  const found = matches.find((m) => !skip.has(m));
+  return found ? found.slice(1, -1) : null; // strip surrounding quotes
+}
+
 function parseYouTubeRss(xml: string): {
   channelName: string | null;
   entries: Array<{ title: string; url: string; publishedAt: string }>;
 } {
-  // Channel name is the first <title> that appears before any <entry> block
   const feedSection = xml.includes("<entry>") ? xml.slice(0, xml.indexOf("<entry>")) : xml;
   const titleMatch = /<title>([^<]+)<\/title>/.exec(feedSection);
   const channelName = titleMatch ? decodeHtmlEntities(titleMatch[1].trim()) : null;
@@ -77,39 +129,15 @@ router.get("/channels/validate", async (req, res): Promise<void> => {
   if (CHANNEL_ID_RE.test(handle)) {
     channelId = handle;
   } else {
-    // Resolve @handle -> channel ID by fetching the YouTube channel page
-    const ytHandle = handle.startsWith("@") ? handle : `@${handle}`;
     try {
-      const pageRes = await fetch(`https://www.youtube.com/${ytHandle}`, {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-          "Accept-Language": "en-US,en;q=0.9",
-        },
-        signal: AbortSignal.timeout(8000),
-      });
-      if (!pageRes.ok) {
-        res.status(404).json({ error: "YouTube channel page not found" });
-        return;
-      }
-      const html = await pageRes.text();
-      // Try several patterns YouTube has used across page versions
-      const match =
-        html.match(/"channelId":"(UC[\w-]{22})"/) ||
-        html.match(/"externalChannelId":"(UC[\w-]{22})"/) ||
-        html.match(/\/channel\/(UC[\w-]{22})/) ||
-        html.match(/"ucid":"(UC[\w-]{22})"/);
-      if (!match) {
+      const resolved = await resolveHandleToChannelId(handle);
+      if (!resolved.channelId) {
         res.status(404).json({ error: "Could not resolve channel ID from this handle" });
         return;
       }
-      channelId = match[1];
-
-      // Extract avatar and description from og meta tags (best-effort)
-      const avatarMatch = html.match(/<meta property="og:image"\s+content="([^"]+)"/);
-      channelAvatarUrl = avatarMatch ? avatarMatch[1] : null;
-      const descMatch = html.match(/<meta property="og:description"\s+content="([^"]+)"/);
-      channelDescription = descMatch ? decodeHtmlEntities(descMatch[1]) : null;
+      channelId = resolved.channelId;
+      channelAvatarUrl = resolved.avatarUrl;
+      channelDescription = resolved.description;
     } catch (err) {
       req.log.error({ err }, "Failed to resolve YouTube handle");
       res.status(502).json({ error: "Failed to reach YouTube" });
@@ -172,6 +200,76 @@ router.get("/channels/validate", async (req, res): Promise<void> => {
   });
 });
 
+/**
+ * Generate the VPS channels.json content.
+ * Resolves missing channel IDs for @handle channels and caches them in the DB.
+ * For channels stored as UC IDs, resolves the @handle from YouTube.
+ */
+router.get("/channels/channels-json", async (req, res): Promise<void> => {
+  try {
+    const channels = await db
+      .select()
+      .from(trackedChannels)
+      .orderBy(trackedChannels.createdAt);
+
+    // Resolve missing info in parallel (batched to avoid YouTube rate limits)
+    const BATCH = 5;
+    const needsResolution = channels.filter((ch) => !ch.channelId);
+
+    for (let i = 0; i < needsResolution.length; i += BATCH) {
+      const batch = needsResolution.slice(i, i + BATCH);
+      await Promise.all(
+        batch.map(async (ch) => {
+          try {
+            if (ch.youtubeHandle.startsWith("@") || !CHANNEL_ID_RE.test(ch.youtubeHandle)) {
+              // Resolve @handle → UC ID
+              const resolved = await resolveHandleToChannelId(ch.youtubeHandle);
+              if (resolved.channelId) {
+                await db
+                  .update(trackedChannels)
+                  .set({ channelId: resolved.channelId })
+                  .where(eq(trackedChannels.id, ch.id));
+                ch.channelId = resolved.channelId;
+              }
+            } else {
+              // youtubeHandle IS a UC ID — set channelId = youtubeHandle
+              await db
+                .update(trackedChannels)
+                .set({ channelId: ch.youtubeHandle })
+                .where(eq(trackedChannels.id, ch.id));
+              ch.channelId = ch.youtubeHandle;
+            }
+          } catch {
+            // best-effort, leave channelId null
+          }
+        }),
+      );
+    }
+
+    // Build channels.json: { "@handle": "UCxxxxxx" }
+    const json: Record<string, string> = {};
+    for (const ch of channels) {
+      let handle = ch.youtubeHandle;
+      let ucId = ch.channelId ?? ch.youtubeHandle;
+
+      // If youtubeHandle is a UC ID, try to derive @handle
+      if (CHANNEL_ID_RE.test(handle)) {
+        const resolved = await resolveChannelIdToHandle(handle).catch(() => null);
+        handle = resolved ?? `@${ch.displayName.replace(/[^A-Za-z0-9_]/g, "")}`;
+        ucId = ch.youtubeHandle;
+      }
+
+      if (!handle.startsWith("@")) handle = `@${handle}`;
+      json[handle] = ucId;
+    }
+
+    res.json(json);
+  } catch (err) {
+    req.log.error({ err }, "Failed to generate channels.json");
+    res.status(500).json({ error: "Failed to generate channels.json" });
+  }
+});
+
 router.post("/channels", async (req, res): Promise<void> => {
   const body = CreateChannelBody.safeParse(req.body);
   if (!body.success) {
@@ -185,6 +283,7 @@ router.post("/channels", async (req, res): Promise<void> => {
       .values({
         displayName: body.data.displayName,
         youtubeHandle: body.data.youtubeHandle,
+        channelId: body.data.channelId ?? null,
         scraperName: body.data.scraperName ?? null,
         avatarUrl: body.data.avatarUrl ?? null,
         description: body.data.description ?? null,

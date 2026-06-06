@@ -24,6 +24,7 @@ import type {
   CreateChannelBody,
   DashboardSummary,
   ErrorResponse,
+  GetChannelsJson200,
   GmailStatus,
   HealthStatus,
   RunsData,
@@ -501,6 +502,84 @@ export function useValidateChannel<TData = Awaited<ReturnType<typeof validateCha
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getValidateChannelQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetChannelsJsonUrl = () => {
+
+
+
+
+  return `/api/channels/channels-json`
+}
+
+/**
+ * Resolves UC channel IDs for all tracked channels and returns the channels.json object ready to deploy to the VPS scraper.
+ * @summary Generate VPS channels.json
+ */
+export const getChannelsJson = async ( options?: RequestInit): Promise<GetChannelsJson200> => {
+
+  return customFetch<GetChannelsJson200>(getGetChannelsJsonUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetChannelsJsonQueryKey = () => {
+    return [
+    `/api/channels/channels-json`
+    ] as const;
+    }
+
+
+export const getGetChannelsJsonQueryOptions = <TData = Awaited<ReturnType<typeof getChannelsJson>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getChannelsJson>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetChannelsJsonQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getChannelsJson>>> = ({ signal }) => getChannelsJson({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getChannelsJson>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetChannelsJsonQueryResult = NonNullable<Awaited<ReturnType<typeof getChannelsJson>>>
+export type GetChannelsJsonQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Generate VPS channels.json
+ */
+
+export function useGetChannelsJson<TData = Awaited<ReturnType<typeof getChannelsJson>>, TError = ErrorType<ErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getChannelsJson>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetChannelsJsonQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

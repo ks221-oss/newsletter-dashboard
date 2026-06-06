@@ -156,6 +156,28 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /channels/channels-json:
+    get:
+      operationId: getChannelsJson
+      tags: [channels]
+      summary: Generate VPS channels.json
+      description: Resolves UC channel IDs for all tracked channels and returns the channels.json object ready to deploy to the VPS scraper.
+      responses:
+        "200":
+          description: channels.json object mapping @handle to UCxxxxxx channel ID
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+        "500":
+          description: Failed to generate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /channels/{id}:
     patch:
       operationId: updateChannel
@@ -324,6 +346,11 @@ components:
           type: string
         youtubeHandle:
           type: string
+          description: The @handle as typed by the user (e.g. @SemiAnalysis)
+        channelId:
+          type: string
+          nullable: true
+          description: Resolved UCxxxxxx channel ID used for RSS feeds and VPS channels.json
         scraperName:
           type: string
           nullable: true
@@ -343,6 +370,7 @@ components:
         - id
         - displayName
         - youtubeHandle
+        - channelId
         - scraperName
         - avatarUrl
         - description
@@ -357,6 +385,11 @@ components:
         youtubeHandle:
           type: string
           minLength: 1
+          description: The @handle as typed by the user (e.g. @SemiAnalysis)
+        channelId:
+          type: string
+          nullable: true
+          description: Resolved UCxxxxxx channel ID
         scraperName:
           type: string
           nullable: true

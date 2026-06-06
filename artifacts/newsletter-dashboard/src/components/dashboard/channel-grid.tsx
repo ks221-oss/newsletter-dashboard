@@ -6,6 +6,7 @@ import {
   useDeleteChannel,
   useGetDashboardRuns,
   useValidateChannel,
+  useGetChannelsJson,
   getGetChannelsQueryKey,
   getGetDashboardRunsQueryKey,
   getValidateChannelQueryKey,
@@ -25,6 +26,9 @@ import {
   CheckCircle2,
   Search,
   ExternalLink,
+  RefreshCw,
+  Copy,
+  CheckCheck,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -387,6 +391,8 @@ export default function ChannelGrid() {
   const [filterTab, setFilterTab] = useState<FilterTab>("all");
   const [addState, setAddState] = useState<AddState>({ kind: "idle" });
   const [debouncedHandle, setDebouncedHandle] = useState("");
+  const [syncOpen, setSyncOpen] = useState(false);
+  const [syncCopied, setSyncCopied] = useState(false);
 
   // Capture current parsedHandle in a ref for use inside mutation callbacks
   const pendingHandleRef = useRef<string>("");
@@ -399,6 +405,19 @@ export default function ChannelGrid() {
 
   const { data: runsData } = useGetDashboardRuns({
     query: { queryKey: getGetDashboardRunsQueryKey() },
+  });
+
+  // Lazy-loaded: only fetches when the Sync panel is opened
+  const {
+    data: channelsJson,
+    isFetching: syncFetching,
+    refetch: refetchSync,
+  } = useGetChannelsJson({
+    query: {
+      queryKey: ["channels-json"],
+      enabled: syncOpen,
+      staleTime: 0,
+    },
   });
 
   // All unique channel name strings seen across every run's video list
@@ -517,20 +536,24 @@ export default function ChannelGrid() {
 
   function handleAdd(e: React.FormEvent) {
     e.preventDefault();
-    // Use the canonical handle resolved by validation (UC... channel ID for @handle inputs);
-    // fall back to raw parsed handle only as a safety guard (canSubmit requires validation).
-    const canonicalHandle = validation?.youtubeHandle ?? parseYouTubeInput(urlInput);
-    if (!canonicalHandle || !effectiveName) return;
+    // parsedHandle is the @handle the user typed (e.g. "@SemiAnalysis")
+    // validation.youtubeHandle is the resolved UC channel ID
+    const handleToStore = parsedHandle || parseYouTubeInput(urlInput);
+    const channelIdResolved = validation?.youtubeHandle; // UC ID
+    if (!handleToStore || !effectiveName) return;
     const exists = channels?.some(
-      (ch) => ch.youtubeHandle.toLowerCase() === canonicalHandle.toLowerCase(),
+      (ch) =>
+        ch.youtubeHandle.toLowerCase() === handleToStore.toLowerCase() ||
+        (channelIdResolved && ch.channelId?.toLowerCase() === channelIdResolved.toLowerCase()),
     );
-    if (exists) { setAddState({ kind: "duplicate", handle: canonicalHandle }); return; }
-    pendingHandleRef.current = canonicalHandle;
+    if (exists) { setAddState({ kind: "duplicate", handle: handleToStore }); return; }
+    pendingHandleRef.current = handleToStore;
     setAddState({ kind: "adding" });
     createChannel({
       data: {
         displayName: effectiveName,
-        youtubeHandle: canonicalHandle,
+        youtubeHandle: handleToStore,
+        channelId: channelIdResolved ?? null,
         avatarUrl: validation?.avatarUrl ?? null,
         description: validation?.description ?? null,
       },
@@ -546,13 +569,15 @@ export default function ChannelGrid() {
     userEditedNameRef.current = false;
   }
 
-  // Use the canonical handle (resolved by validation) for duplicate detection so that
-  // @handle and UC... formats for the same channel don't bypass the check.
-  const canonicalHandleForDupe = validation?.youtubeHandle ?? parsedHandle;
+  // Duplicate detection: check @handle match OR UC channel ID match (catches re-adds
+  // via URL even if the stored handle format differs).
   const isDuplicateInline =
-    !!canonicalHandleForDupe &&
+    !!parsedHandle &&
     !!channels?.some(
-      (ch) => ch.youtubeHandle.toLowerCase() === canonicalHandleForDupe.toLowerCase(),
+      (ch) =>
+        ch.youtubeHandle.toLowerCase() === parsedHandle.toLowerCase() ||
+        (validation?.youtubeHandle &&
+          ch.channelId?.toLowerCase() === validation.youtubeHandle.toLowerCase()),
     );
 
   // Still waiting for the debounce timer to fire
@@ -612,17 +637,82 @@ export default function ChannelGrid() {
             YouTube channels currently monitored for new content
           </p>
         </div>
-        {allChannels.length > 0 && activeCount > 0 && (
-          <span className="shrink-0 text-[9px] font-mono px-2 py-1 border border-emerald-500/30 text-emerald-400 bg-emerald-500/10 uppercase tracking-wider whitespace-nowrap">
-            {activeCount} active
-          </span>
-        )}
-        {allChannels.length > 0 && unmappedCount > 0 && (
-          <span className="shrink-0 text-[9px] font-mono px-2 py-1 border border-amber-500/30 text-amber-400 bg-amber-500/10 uppercase tracking-wider whitespace-nowrap">
-            {unmappedCount} need mapping
-          </span>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {allChannels.length > 0 && activeCount > 0 && (
+            <span className="text-[9px] font-mono px-2 py-1 border border-emerald-500/30 text-emerald-400 bg-emerald-500/10 uppercase tracking-wider whitespace-nowrap">
+              {activeCount} active
+            </span>
+          )}
+          {allChannels.length > 0 && unmappedCount > 0 && (
+            <span className="text-[9px] font-mono px-2 py-1 border border-amber-500/30 text-amber-400 bg-amber-500/10 uppercase tracking-wider whitespace-nowrap">
+              {unmappedCount} need mapping
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => setSyncOpen((v) => !v)}
+            className="flex items-center gap-1.5 text-[9px] font-mono px-2 py-1 border border-border text-muted-foreground hover:text-foreground hover:border-foreground/40 uppercase tracking-wider transition-colors"
+          >
+            <RefreshCw className="w-2.5 h-2.5" />
+            Sync VPS
+          </button>
+        </div>
       </div>
+
+      {/* ── Sync VPS panel ── */}
+      {syncOpen && (
+        <div className="border border-border bg-card p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-mono font-semibold text-foreground uppercase tracking-wider">
+                VPS channels.json
+              </p>
+              <p className="text-[9px] font-mono text-muted-foreground/60 mt-0.5">
+                Copy and paste into <span className="text-muted-foreground">/root/yt-newsletter/channels.json</span> on the VPS
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => refetchSync()}
+                disabled={syncFetching}
+                className="flex items-center gap-1 text-[9px] font-mono px-2 py-1 border border-border text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`w-2.5 h-2.5 ${syncFetching ? "animate-spin" : ""}`} />
+                Refresh
+              </button>
+              <button
+                type="button"
+                disabled={!channelsJson || syncFetching}
+                onClick={() => {
+                  if (!channelsJson) return;
+                  navigator.clipboard.writeText(JSON.stringify(channelsJson, null, 2));
+                  setSyncCopied(true);
+                  setTimeout(() => setSyncCopied(false), 2000);
+                }}
+                className="flex items-center gap-1 text-[9px] font-mono px-2 py-1 border border-border text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
+              >
+                {syncCopied ? (
+                  <><CheckCheck className="w-2.5 h-2.5 text-emerald-400" /><span className="text-emerald-400">Copied!</span></>
+                ) : (
+                  <><Copy className="w-2.5 h-2.5" />Copy JSON</>
+                )}
+              </button>
+            </div>
+          </div>
+          {syncFetching && (
+            <div className="flex items-center gap-2 py-4 justify-center text-[10px] font-mono text-muted-foreground/60">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Resolving channel IDs — this may take ~30s for all channels…
+            </div>
+          )}
+          {!syncFetching && channelsJson && (
+            <pre className="text-[10px] font-mono bg-background border border-border p-3 overflow-auto max-h-72 text-muted-foreground leading-relaxed">
+              {JSON.stringify(channelsJson, null, 2)}
+            </pre>
+          )}
+        </div>
+      )}
 
       {/* ── Add channel form ── */}
       <form onSubmit={handleAdd} className="space-y-2">

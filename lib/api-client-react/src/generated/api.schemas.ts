@@ -48,7 +48,10 @@ export interface GmailStatus {
 export interface TrackedChannel {
   id: number;
   displayName: string;
+  /** The @handle as typed by the user (e.g. @SemiAnalysis) */
   youtubeHandle: string;
+  /** Resolved UCxxxxxx channel ID used for RSS feeds and VPS channels.json */
+  channelId: string | null;
   /** Exact channel name string reported by the VPS scraper (used to match against telemetry data) */
   scraperName: string | null;
   /** YouTube channel avatar image URL */
@@ -61,8 +64,13 @@ export interface TrackedChannel {
 export interface CreateChannelBody {
   /** @minLength 1 */
   displayName: string;
-  /** @minLength 1 */
+  /**
+     * The @handle as typed by the user (e.g. @SemiAnalysis)
+     * @minLength 1
+     */
   youtubeHandle: string;
+  /** Resolved UCxxxxxx channel ID */
+  channelId?: string | null;
   /** Optional exact channel name string as reported by the VPS scraper */
   scraperName?: string | null;
   /** YouTube channel avatar image URL */
@@ -112,4 +120,6 @@ export type ValidateChannelParams = {
  */
 handle: string;
 };
+
+export type GetChannelsJson200 = {[key: string]: string};
 

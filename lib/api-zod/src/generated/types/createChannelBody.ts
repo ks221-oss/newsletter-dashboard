@@ -9,8 +9,13 @@
 export interface CreateChannelBody {
   /** @minLength 1 */
   displayName: string;
-  /** @minLength 1 */
+  /**
+     * The @handle as typed by the user (e.g. @SemiAnalysis)
+     * @minLength 1
+     */
   youtubeHandle: string;
+  /** Resolved UCxxxxxx channel ID */
+  channelId?: string | null;
   /** Optional exact channel name string as reported by the VPS scraper */
   scraperName?: string | null;
   /** YouTube channel avatar image URL */

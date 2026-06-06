@@ -9,7 +9,10 @@
 export interface TrackedChannel {
   id: number;
   displayName: string;
+  /** The @handle as typed by the user (e.g. @SemiAnalysis) */
   youtubeHandle: string;
+  /** Resolved UCxxxxxx channel ID used for RSS feeds and VPS channels.json */
+  channelId: string | null;
   /** Exact channel name string reported by the VPS scraper (used to match against telemetry data) */
   scraperName: string | null;
   /** YouTube channel avatar image URL */

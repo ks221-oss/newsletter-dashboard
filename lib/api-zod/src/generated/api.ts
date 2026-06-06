@@ -56,7 +56,8 @@ export const GetGmailStatusResponse = zod.object({
 export const GetChannelsResponseItem = zod.object({
   "id": zod.number(),
   "displayName": zod.string(),
-  "youtubeHandle": zod.string(),
+  "youtubeHandle": zod.string().describe('The @handle as typed by the user (e.g. @SemiAnalysis)'),
+  "channelId": zod.string().nullable().describe('Resolved UCxxxxxx channel ID used for RSS feeds and VPS channels.json'),
   "scraperName": zod.string().nullable().describe('Exact channel name string reported by the VPS scraper (used to match against telemetry data)'),
   "avatarUrl": zod.string().nullable().describe('YouTube channel avatar image URL'),
   "description": zod.string().nullable().describe('YouTube channel description'),
@@ -75,7 +76,8 @@ export const GetChannelsResponse = zod.array(GetChannelsResponseItem)
 
 export const CreateChannelBody = zod.object({
   "displayName": zod.string().min(1),
-  "youtubeHandle": zod.string().min(1),
+  "youtubeHandle": zod.string().min(1).describe('The @handle as typed by the user (e.g. @SemiAnalysis)'),
+  "channelId": zod.string().nullish().describe('Resolved UCxxxxxx channel ID'),
   "scraperName": zod.string().nullish().describe('Optional exact channel name string as reported by the VPS scraper'),
   "avatarUrl": zod.string().nullish().describe('YouTube channel avatar image URL'),
   "description": zod.string().nullish().describe('YouTube channel description')
@@ -108,6 +110,13 @@ export const ValidateChannelResponse = zod.object({
 
 
 /**
+ * Resolves UC channel IDs for all tracked channels and returns the channels.json object ready to deploy to the VPS scraper.
+ * @summary Generate VPS channels.json
+ */
+export const GetChannelsJsonResponse = zod.record(zod.string(), zod.string())
+
+
+/**
  * Updates mutable fields (currently scraperName) on a tracked channel
  * @summary Update a tracked channel
  */
@@ -122,7 +131,8 @@ export const UpdateChannelBody = zod.object({
 export const UpdateChannelResponse = zod.object({
   "id": zod.number(),
   "displayName": zod.string(),
-  "youtubeHandle": zod.string(),
+  "youtubeHandle": zod.string().describe('The @handle as typed by the user (e.g. @SemiAnalysis)'),
+  "channelId": zod.string().nullable().describe('Resolved UCxxxxxx channel ID used for RSS feeds and VPS channels.json'),
   "scraperName": zod.string().nullable().describe('Exact channel name string reported by the VPS scraper (used to match against telemetry data)'),
   "avatarUrl": zod.string().nullable().describe('YouTube channel avatar image URL'),
   "description": zod.string().nullable().describe('YouTube channel description'),
@@ -141,7 +151,8 @@ export const DeleteChannelParams = zod.object({
 export const DeleteChannelResponse = zod.object({
   "id": zod.number(),
   "displayName": zod.string(),
-  "youtubeHandle": zod.string(),
+  "youtubeHandle": zod.string().describe('The @handle as typed by the user (e.g. @SemiAnalysis)'),
+  "channelId": zod.string().nullable().describe('Resolved UCxxxxxx channel ID used for RSS feeds and VPS channels.json'),
   "scraperName": zod.string().nullable().describe('Exact channel name string reported by the VPS scraper (used to match against telemetry data)'),
   "avatarUrl": zod.string().nullable().describe('YouTube channel avatar image URL'),
   "description": zod.string().nullable().describe('YouTube channel description'),

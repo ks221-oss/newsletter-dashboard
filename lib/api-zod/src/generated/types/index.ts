@@ -11,6 +11,7 @@ export * from './channelVideo';
 export * from './createChannelBody';
 export * from './dashboardSummary';
 export * from './errorResponse';
+export * from './getChannelsJson200';
 export * from './gmailStatus';
 export * from './healthStatus';
 export * from './runRecord';
