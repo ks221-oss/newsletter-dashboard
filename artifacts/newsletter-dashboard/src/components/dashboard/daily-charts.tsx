@@ -37,9 +37,11 @@ function buildChartData(runsData: RunsData): DailyChartPoint[] {
       if (run.email_sent) anyEmailSent = true;
     }
 
-    const [, m, d] = date.split("-");
+    const dt = new Date(date + "T00:00:00Z");
+    const monthAbbr = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const label = `${monthAbbr[dt.getUTCMonth()]} ${dt.getUTCDate()}`;
     return {
-      label: `${parseInt(m)}/${parseInt(d)}`,
+      label,
       fullDate: date,
       totalVideos,
       transcriptRate: totalVideos > 0 ? Math.round((okTranscripts / totalVideos) * 100) : 0,

@@ -152,8 +152,8 @@ export default function DayRow({ date, runs, allChannels, isRecent = false }: Da
                 <XCircle className="w-3 h-3 mr-1" /> MISSING
               </Badge>
             ) : (
-              <Badge variant="outline" className="text-muted-foreground font-mono text-[10px] rounded-none px-1 uppercase tracking-wider">
-                <HelpCircle className="w-3 h-3 mr-1" /> UNKNOWN
+              <Badge variant="outline" className="text-yellow-500 border-yellow-500/30 font-mono text-[10px] rounded-none px-1 uppercase tracking-wider bg-yellow-500/10">
+                <HelpCircle className="w-3 h-3 mr-1" /> GMAIL_ERR
               </Badge>
             )
           )}
@@ -218,7 +218,7 @@ export default function DayRow({ date, runs, allChannels, isRecent = false }: Da
                         {noDrop ? (
                           <span className="font-mono text-[10px] text-muted-foreground">NO_DROP</span>
                         ) : stats.ok === stats.videos ? (
-                          <span className="font-mono text-[10px] text-emerald-400">OK</span>
+                          <span className="font-mono text-[10px] text-emerald-400">ALL_TRANSCRIBED</span>
                         ) : stats.ok === 0 ? (
                           <span className="font-mono text-[10px] text-red-400">ALL_FAILED</span>
                         ) : (
