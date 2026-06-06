@@ -91,7 +91,12 @@ router.get("/channels/validate", async (req, res): Promise<void> => {
         return;
       }
       const html = await pageRes.text();
-      const match = html.match(/"channelId":"(UC[\w-]{22})"/);
+      // Try several patterns YouTube has used across page versions
+      const match =
+        html.match(/"channelId":"(UC[\w-]{22})"/) ||
+        html.match(/"externalChannelId":"(UC[\w-]{22})"/) ||
+        html.match(/\/channel\/(UC[\w-]{22})/) ||
+        html.match(/"ucid":"(UC[\w-]{22})"/);
       if (!match) {
         res.status(404).json({ error: "Could not resolve channel ID from this handle" });
         return;
