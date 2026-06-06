@@ -204,6 +204,8 @@ function ChannelCard({
             <img
               src={ch.avatarUrl}
               alt={ch.displayName}
+              referrerPolicy="no-referrer"
+              crossOrigin="anonymous"
               className="w-10 h-10 rounded-full shrink-0 object-cover ring-1 ring-border/40"
               onError={(e) => {
                 (e.currentTarget as HTMLImageElement).style.display = "none";
