@@ -71,6 +71,8 @@ router.get("/channels/validate", async (req, res): Promise<void> => {
 
   // Step 1: resolve to a channel ID
   let channelId: string;
+  let channelAvatarUrl: string | null = null;
+  let channelDescription: string | null = null;
 
   if (CHANNEL_ID_RE.test(handle)) {
     channelId = handle;
@@ -102,6 +104,12 @@ router.get("/channels/validate", async (req, res): Promise<void> => {
         return;
       }
       channelId = match[1];
+
+      // Extract avatar and description from og meta tags (best-effort)
+      const avatarMatch = html.match(/<meta property="og:image"\s+content="([^"]+)"/);
+      channelAvatarUrl = avatarMatch ? avatarMatch[1] : null;
+      const descMatch = html.match(/<meta property="og:description"\s+content="([^"]+)"/);
+      channelDescription = descMatch ? decodeHtmlEntities(descMatch[1]) : null;
     } catch (err) {
       req.log.error({ err }, "Failed to resolve YouTube handle");
       res.status(502).json({ error: "Failed to reach YouTube" });
@@ -154,7 +162,14 @@ router.get("/channels/validate", async (req, res): Promise<void> => {
     }
   }
 
-  res.json({ channelName, youtubeHandle: channelId, lookbackDays, videos });
+  res.json({
+    channelName,
+    youtubeHandle: channelId,
+    avatarUrl: channelAvatarUrl,
+    description: channelDescription,
+    lookbackDays,
+    videos,
+  });
 });
 
 router.post("/channels", async (req, res): Promise<void> => {
@@ -171,6 +186,8 @@ router.post("/channels", async (req, res): Promise<void> => {
         displayName: body.data.displayName,
         youtubeHandle: body.data.youtubeHandle,
         scraperName: body.data.scraperName ?? null,
+        avatarUrl: body.data.avatarUrl ?? null,
+        description: body.data.description ?? null,
       })
       .returning();
     res.status(201).json(created);

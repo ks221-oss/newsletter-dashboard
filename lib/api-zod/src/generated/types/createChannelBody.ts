@@ -13,4 +13,8 @@ export interface CreateChannelBody {
   youtubeHandle: string;
   /** Optional exact channel name string as reported by the VPS scraper */
   scraperName?: string | null;
+  /** YouTube channel avatar image URL */
+  avatarUrl?: string | null;
+  /** YouTube channel description */
+  description?: string | null;
 }

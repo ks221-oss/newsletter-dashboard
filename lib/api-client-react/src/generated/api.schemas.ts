@@ -51,6 +51,10 @@ export interface TrackedChannel {
   youtubeHandle: string;
   /** Exact channel name string reported by the VPS scraper (used to match against telemetry data) */
   scraperName: string | null;
+  /** YouTube channel avatar image URL */
+  avatarUrl: string | null;
+  /** YouTube channel description */
+  description: string | null;
   createdAt: string;
 }
 
@@ -61,6 +65,10 @@ export interface CreateChannelBody {
   youtubeHandle: string;
   /** Optional exact channel name string as reported by the VPS scraper */
   scraperName?: string | null;
+  /** YouTube channel avatar image URL */
+  avatarUrl?: string | null;
+  /** YouTube channel description */
+  description?: string | null;
 }
 
 export interface UpdateChannelBody {
@@ -79,6 +87,10 @@ export interface ChannelValidation {
   channelName: string | null;
   /** Resolved channel ID (UCxxxxxx) used to fetch RSS */
   youtubeHandle: string;
+  /** YouTube channel avatar image URL */
+  avatarUrl: string | null;
+  /** YouTube channel description */
+  description: string | null;
   /** Window used — 14 if videos found in last 14 days, otherwise 90 */
   lookbackDays: number;
   videos: ChannelVideo[];

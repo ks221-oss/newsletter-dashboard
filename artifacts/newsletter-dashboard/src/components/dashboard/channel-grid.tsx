@@ -186,17 +186,34 @@ function ChannelCard({
         ? "bg-amber-500/50"
         : "bg-border/40";
 
+  const ytChannelUrl = ch.youtubeHandle.startsWith("UC")
+    ? `https://www.youtube.com/channel/${ch.youtubeHandle}`
+    : `https://www.youtube.com/${ch.youtubeHandle}`;
+
   return (
     <div className="border border-border/50 bg-card hover:border-border transition-colors flex flex-col">
       {/* ── Card body ── */}
-      <div className="p-3 flex flex-col gap-2 flex-1">
+      <div className="p-3 flex flex-col gap-2.5 flex-1">
         {/* Top row: avatar + activity dot */}
-        <div className="flex items-start justify-between">
-          <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${palette.bg}`}>
+        <div className="flex items-start justify-between gap-2">
+          {ch.avatarUrl ? (
+            <img
+              src={ch.avatarUrl}
+              alt={ch.displayName}
+              className="w-10 h-10 rounded-full shrink-0 object-cover ring-1 ring-border/40"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.display = "none";
+                (e.currentTarget.nextElementSibling as HTMLElement | null)?.style.setProperty("display", "flex");
+              }}
+            />
+          ) : null}
+          <div
+            className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${palette.bg} ${ch.avatarUrl ? "hidden" : ""}`}
+          >
             <span className={`text-[11px] font-mono font-bold ${palette.text}`}>{abbr}</span>
           </div>
           <span
-            className={`w-2 h-2 rounded-full mt-0.5 shrink-0 ${dotClass} ${status === "active" ? "animate-pulse" : ""}`}
+            className={`w-2 h-2 rounded-full mt-1 shrink-0 ${dotClass} ${status === "active" ? "animate-pulse" : ""}`}
             title={
               status === "active" ? `Active — last seen ${lastSeen}` :
               status === "idle" ? "Idle — not seen recently" :
@@ -205,15 +222,27 @@ function ChannelCard({
           />
         </div>
 
-        {/* Name + handle */}
+        {/* Name + YouTube link */}
         <div className="min-w-0">
           <div className="font-mono text-[12px] font-semibold text-foreground truncate leading-tight">
             {ch.displayName}
           </div>
-          <div className="font-mono text-[10px] text-muted-foreground truncate leading-tight mt-0.5">
-            {ch.youtubeHandle}
-          </div>
+          <a
+            href={ytChannelUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-0.5 font-mono text-[10px] text-primary/60 hover:text-primary truncate leading-tight mt-0.5 transition-colors"
+          >
+            youtube.com <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+          </a>
         </div>
+
+        {/* Description */}
+        {ch.description && (
+          <p className="font-mono text-[9.5px] text-muted-foreground leading-relaxed line-clamp-3 opacity-70">
+            {ch.description}
+          </p>
+        )}
 
         {/* Last seen + expand toggle */}
         <div className="flex items-center justify-between mt-auto pt-1 border-t border-border/30">
@@ -498,7 +527,14 @@ export default function ChannelGrid() {
     if (exists) { setAddState({ kind: "duplicate", handle: canonicalHandle }); return; }
     pendingHandleRef.current = canonicalHandle;
     setAddState({ kind: "adding" });
-    createChannel({ data: { displayName: effectiveName, youtubeHandle: canonicalHandle } });
+    createChannel({
+      data: {
+        displayName: effectiveName,
+        youtubeHandle: canonicalHandle,
+        avatarUrl: validation?.avatarUrl ?? null,
+        description: validation?.description ?? null,
+      },
+    });
   }
 
   function handleClearInput() {

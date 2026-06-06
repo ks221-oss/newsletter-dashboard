@@ -12,5 +12,9 @@ export interface TrackedChannel {
   youtubeHandle: string;
   /** Exact channel name string reported by the VPS scraper (used to match against telemetry data) */
   scraperName: string | null;
+  /** YouTube channel avatar image URL */
+  avatarUrl: string | null;
+  /** YouTube channel description */
+  description: string | null;
   createdAt: Date;
 }

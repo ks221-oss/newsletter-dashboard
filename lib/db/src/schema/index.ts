@@ -7,6 +7,8 @@ export const trackedChannels = pgTable("tracked_channels", {
   displayName: text("display_name").notNull(),
   youtubeHandle: text("youtube_handle").notNull().unique(),
   scraperName: text("scraper_name"),
+  avatarUrl: text("avatar_url"),
+  description: text("description"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

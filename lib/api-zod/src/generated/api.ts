@@ -58,6 +58,8 @@ export const GetChannelsResponseItem = zod.object({
   "displayName": zod.string(),
   "youtubeHandle": zod.string(),
   "scraperName": zod.string().nullable().describe('Exact channel name string reported by the VPS scraper (used to match against telemetry data)'),
+  "avatarUrl": zod.string().nullable().describe('YouTube channel avatar image URL'),
+  "description": zod.string().nullable().describe('YouTube channel description'),
   "createdAt": zod.coerce.date()
 })
 export const GetChannelsResponse = zod.array(GetChannelsResponseItem)
@@ -74,7 +76,9 @@ export const GetChannelsResponse = zod.array(GetChannelsResponseItem)
 export const CreateChannelBody = zod.object({
   "displayName": zod.string().min(1),
   "youtubeHandle": zod.string().min(1),
-  "scraperName": zod.string().nullish().describe('Optional exact channel name string as reported by the VPS scraper')
+  "scraperName": zod.string().nullish().describe('Optional exact channel name string as reported by the VPS scraper'),
+  "avatarUrl": zod.string().nullish().describe('YouTube channel avatar image URL'),
+  "description": zod.string().nullish().describe('YouTube channel description')
 })
 
 
@@ -92,6 +96,8 @@ export const ValidateChannelQueryParams = zod.object({
 export const ValidateChannelResponse = zod.object({
   "channelName": zod.string().nullable().describe('Real display name resolved from YouTube RSS feed'),
   "youtubeHandle": zod.string().describe('Resolved channel ID (UCxxxxxx) used to fetch RSS'),
+  "avatarUrl": zod.string().nullable().describe('YouTube channel avatar image URL'),
+  "description": zod.string().nullable().describe('YouTube channel description'),
   "lookbackDays": zod.number().describe('Window used — 14 if videos found in last 14 days, otherwise 90'),
   "videos": zod.array(zod.object({
   "title": zod.string(),
@@ -118,6 +124,8 @@ export const UpdateChannelResponse = zod.object({
   "displayName": zod.string(),
   "youtubeHandle": zod.string(),
   "scraperName": zod.string().nullable().describe('Exact channel name string reported by the VPS scraper (used to match against telemetry data)'),
+  "avatarUrl": zod.string().nullable().describe('YouTube channel avatar image URL'),
+  "description": zod.string().nullable().describe('YouTube channel description'),
   "createdAt": zod.coerce.date()
 })
 
@@ -135,6 +143,8 @@ export const DeleteChannelResponse = zod.object({
   "displayName": zod.string(),
   "youtubeHandle": zod.string(),
   "scraperName": zod.string().nullable().describe('Exact channel name string reported by the VPS scraper (used to match against telemetry data)'),
+  "avatarUrl": zod.string().nullable().describe('YouTube channel avatar image URL'),
+  "description": zod.string().nullable().describe('YouTube channel description'),
   "createdAt": zod.coerce.date()
 })
 

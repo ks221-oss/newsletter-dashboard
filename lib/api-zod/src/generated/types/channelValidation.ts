@@ -12,6 +12,10 @@ export interface ChannelValidation {
   channelName: string | null;
   /** Resolved channel ID (UCxxxxxx) used to fetch RSS */
   youtubeHandle: string;
+  /** YouTube channel avatar image URL */
+  avatarUrl: string | null;
+  /** YouTube channel description */
+  description: string | null;
   /** Window used — 14 if videos found in last 14 days, otherwise 90 */
   lookbackDays: number;
   videos: ChannelVideo[];

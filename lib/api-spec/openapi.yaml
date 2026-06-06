@@ -328,6 +328,14 @@ components:
           type: string
           nullable: true
           description: Exact channel name string reported by the VPS scraper (used to match against telemetry data)
+        avatarUrl:
+          type: string
+          nullable: true
+          description: YouTube channel avatar image URL
+        description:
+          type: string
+          nullable: true
+          description: YouTube channel description
         createdAt:
           type: string
           format: date-time
@@ -336,6 +344,8 @@ components:
         - displayName
         - youtubeHandle
         - scraperName
+        - avatarUrl
+        - description
         - createdAt
 
     CreateChannelBody:
@@ -351,6 +361,14 @@ components:
           type: string
           nullable: true
           description: Optional exact channel name string as reported by the VPS scraper
+        avatarUrl:
+          type: string
+          nullable: true
+          description: YouTube channel avatar image URL
+        description:
+          type: string
+          nullable: true
+          description: YouTube channel description
       required:
         - displayName
         - youtubeHandle
@@ -388,6 +406,14 @@ components:
         youtubeHandle:
           type: string
           description: Resolved channel ID (UCxxxxxx) used to fetch RSS
+        avatarUrl:
+          type: string
+          nullable: true
+          description: YouTube channel avatar image URL
+        description:
+          type: string
+          nullable: true
+          description: YouTube channel description
         lookbackDays:
           type: integer
           description: Window used — 14 if videos found in last 14 days, otherwise 90
@@ -398,6 +424,8 @@ components:
       required:
         - channelName
         - youtubeHandle
+        - avatarUrl
+        - description
         - lookbackDays
         - videos
 
