@@ -50,6 +50,49 @@ export const GetGmailStatusResponse = zod.object({
 
 
 /**
+ * Returns all YouTube channels configured for monitoring
+ * @summary List tracked channels
+ */
+export const GetChannelsResponseItem = zod.object({
+  "id": zod.number(),
+  "displayName": zod.string(),
+  "youtubeHandle": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+export const GetChannelsResponse = zod.array(GetChannelsResponseItem)
+
+
+/**
+ * Adds a new YouTube channel to the monitoring list
+ * @summary Add a tracked channel
+ */
+
+
+
+
+export const CreateChannelBody = zod.object({
+  "displayName": zod.string().min(1),
+  "youtubeHandle": zod.string().min(1)
+})
+
+
+/**
+ * Removes a YouTube channel from the monitoring list
+ * @summary Remove a tracked channel
+ */
+export const DeleteChannelParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteChannelResponse = zod.object({
+  "id": zod.number(),
+  "displayName": zod.string(),
+  "youtubeHandle": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
  * Returns high-level stats about newsletter runs
  * @summary Get dashboard summary stats
  */

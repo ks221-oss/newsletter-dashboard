@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { RunRecord } from "@workspace/api-client-react/src/generated/api.schemas";
-import { useGetGmailStatus } from "@workspace/api-client-react";
+import { RunRecord, VideoRecord } from "@workspace/api-client-react";
+import { useGetGmailStatus, getGetGmailStatusQueryKey } from "@workspace/api-client-react";
 import { ChevronDown, ChevronRight, ExternalLink, CheckCircle2, XCircle, AlertTriangle, HelpCircle, Mail } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
@@ -29,8 +29,8 @@ function getErrorType(error: string) {
 
 function SingleRunDetail({ run, idx }: { run: RunRecord; idx: number }) {
   const [open, setOpen] = useState(false);
-  const ok = run.videos.filter((v) => v.transcript === "ok").length;
-  const failed = run.videos.filter((v) => v.transcript !== "ok" && v.transcript_error);
+  const ok = (run.videos as VideoRecord[]).filter((v) => v.transcript === "ok").length;
+  const failed = (run.videos as VideoRecord[]).filter((v) => v.transcript !== "ok" && v.transcript_error);
 
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="border border-border/50 bg-background/40">
@@ -66,7 +66,7 @@ function SingleRunDetail({ run, idx }: { run: RunRecord; idx: number }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {failed.map((v, i) => {
+              {failed.map((v: VideoRecord, i: number) => {
                 const err = getErrorType(v.transcript_error ?? "");
                 return (
                   <TableRow key={i} className="hover:bg-muted/20 border-border/30">
@@ -100,19 +100,22 @@ export default function DayRow({ date, runs, allChannels, isRecent = false }: Da
   const [isOpen, setIsOpen] = useState(false);
 
   const { data: gmailStatus, isLoading: isGmailLoading } = useGetGmailStatus(date, {
-    query: { enabled: isRecent, refetchInterval: 60000 },
+    query: { queryKey: getGetGmailStatusQueryKey(date), enabled: isRecent, refetchInterval: 60000 },
   });
 
   // Aggregate across all runs
   const totalVideos = runs.reduce((s, r) => s + r.total_videos, 0);
-  const okTranscripts = runs.reduce((s, r) => s + r.videos.filter((v) => v.transcript === "ok").length, 0);
+  const okTranscripts = runs.reduce(
+    (s, r) => s + (r.videos as VideoRecord[]).filter((v) => v.transcript === "ok").length,
+    0,
+  );
   const anyEmailSent = runs.some((r) => r.email_sent);
   const transcriptRate = totalVideos > 0 ? okTranscripts / totalVideos : 0;
 
   // Channel breakdown across all runs
   const channelMap = new Map<string, { videos: number; ok: number }>();
   for (const run of runs) {
-    for (const v of run.videos) {
+    for (const v of run.videos as VideoRecord[]) {
       const ch = v.channel || "Unknown";
       const existing = channelMap.get(ch) ?? { videos: 0, ok: 0 };
       channelMap.set(ch, {
@@ -228,7 +231,6 @@ export default function DayRow({ date, runs, allChannels, isRecent = false }: Da
                     </TableRow>
                   );
                 })}
-                {/* Channels that appeared today but aren't in allChannels (edge case) */}
                 {Array.from(channelMap.entries())
                   .filter(([ch]) => !allChannels.includes(ch))
                   .map(([ch, stats]) => (
@@ -239,7 +241,9 @@ export default function DayRow({ date, runs, allChannels, isRecent = false }: Da
                         {stats.ok}/{stats.videos}
                       </TableCell>
                       <TableCell>
-                        <span className="font-mono text-[10px] text-emerald-400">{stats.ok === stats.videos ? "OK" : "PARTIAL"}</span>
+                        <span className="font-mono text-[10px] text-emerald-400">
+                          {stats.ok === stats.videos ? "ALL_TRANSCRIBED" : "PARTIAL"}
+                        </span>
                       </TableCell>
                     </TableRow>
                   ))}

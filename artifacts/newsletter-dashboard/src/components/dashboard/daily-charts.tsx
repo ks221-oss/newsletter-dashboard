@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { RunsData } from "@workspace/api-client-react/src/generated/api.schemas";
+import { RunsData, VideoRecord } from "@workspace/api-client-react";
 import {
   ComposedChart,
   Bar,
@@ -33,7 +33,7 @@ function buildChartData(runsData: RunsData): DailyChartPoint[] {
 
     for (const run of dayRuns) {
       totalVideos += run.total_videos;
-      okTranscripts += run.videos.filter((v) => v.transcript === "ok").length;
+      okTranscripts += run.videos.filter((v: VideoRecord) => v.transcript === "ok").length;
       if (run.email_sent) anyEmailSent = true;
     }
 

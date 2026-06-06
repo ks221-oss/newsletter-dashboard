@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { RunRecord } from "@workspace/api-client-react/src/generated/api.schemas";
+import { RunRecord, VideoRecord } from "@workspace/api-client-react";
 import DayRow from "./day-row";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, FolderArchive } from "lucide-react";
@@ -24,10 +24,18 @@ export default function WeekGroup({ weekKey, days, allChannels }: WeekGroupProps
   const emailSentDays = days.filter((d) => d.runs.some((r) => r.email_sent)).length;
   const emailRate = totalRunDays > 0 ? Math.round((emailSentDays / totalRunDays) * 100) : 0;
 
-  const totalVideos = days.reduce((s, d) =>
-    s + d.runs.reduce((rs, r) => rs + r.total_videos, 0), 0);
-  const okTranscripts = days.reduce((s, d) =>
-    s + d.runs.reduce((rs, r) => rs + r.videos.filter((v) => v.transcript === "ok").length, 0), 0);
+  const totalVideos = days.reduce(
+    (s, d) => s + d.runs.reduce((rs, r) => rs + r.total_videos, 0),
+    0,
+  );
+  const okTranscripts = days.reduce(
+    (s, d) =>
+      s + d.runs.reduce(
+        (rs, r) => rs + (r.videos as VideoRecord[]).filter((v) => v.transcript === "ok").length,
+        0,
+      ),
+    0,
+  );
   const transcriptRate = totalVideos > 0 ? Math.round((okTranscripts / totalVideos) * 100) : 0;
 
   return (

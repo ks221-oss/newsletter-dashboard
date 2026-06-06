@@ -45,6 +45,20 @@ export interface GmailStatus {
   unavailable: boolean;
 }
 
+export interface TrackedChannel {
+  id: number;
+  displayName: string;
+  youtubeHandle: string;
+  createdAt: string;
+}
+
+export interface CreateChannelBody {
+  /** @minLength 1 */
+  displayName: string;
+  /** @minLength 1 */
+  youtubeHandle: string;
+}
+
 export interface DashboardSummary {
   totalRuns: number;
   last30DaysRuns: number;

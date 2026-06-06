@@ -1,5 +1,5 @@
 import React from "react";
-import { DashboardSummary } from "@workspace/api-client-react/src/generated/api.schemas";
+import { DashboardSummary } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Activity, Mail, Video, Zap } from "lucide-react";
 

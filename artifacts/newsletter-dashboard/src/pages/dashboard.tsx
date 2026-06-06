@@ -1,7 +1,8 @@
 import React from "react";
-import { useGetDashboardRuns } from "@workspace/api-client-react";
+import { useGetDashboardRuns, getGetDashboardRunsQueryKey } from "@workspace/api-client-react";
 import DailyCharts from "@/components/dashboard/daily-charts";
 import Timeline from "@/components/dashboard/timeline";
+import ChannelManager from "@/components/dashboard/channel-manager";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,7 +14,7 @@ export default function Dashboard() {
     error: runsError,
     isRefetching: isRunsRefetching,
   } = useGetDashboardRuns({
-    query: { refetchInterval: 60000 },
+    query: { queryKey: getGetDashboardRunsQueryKey(), refetchInterval: 60000 },
   });
 
   return (
@@ -56,28 +57,39 @@ export default function Dashboard() {
           <div className="space-y-4">
             <Skeleton className="h-16 w-full bg-muted" />
             <Skeleton className="h-16 w-full bg-muted" />
-            <Skeleton className="h-16 w-full bg-muted" />
           </div>
         </div>
-      ) : runsData ? (
+      ) : (
         <>
-          {/* Charts section */}
+          {/* Charts */}
+          {runsData && (
+            <div className="space-y-3">
+              <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase border-b border-border pb-2">
+                METRICS_GRAPH
+              </h2>
+              <DailyCharts runsData={runsData} />
+            </div>
+          )}
+
+          {/* Telemetry log */}
+          {runsData && (
+            <div className="space-y-4">
+              <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase border-b border-border pb-2">
+                TELEMETRY_LOG
+              </h2>
+              <Timeline runsData={runsData} />
+            </div>
+          )}
+
+          {/* Channel management */}
           <div className="space-y-3">
             <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase border-b border-border pb-2">
-              METRICS_GRAPH
+              TRACKED_CHANNELS
             </h2>
-            <DailyCharts runsData={runsData} />
-          </div>
-
-          {/* Timeline */}
-          <div className="space-y-4">
-            <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase border-b border-border pb-2">
-              TELEMETRY_LOG
-            </h2>
-            <Timeline runsData={runsData} />
+            <ChannelManager />
           </div>
         </>
-      ) : null}
+      )}
     </div>
   );
 }

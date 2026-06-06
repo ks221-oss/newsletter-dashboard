@@ -12,6 +12,8 @@ tags:
     description: Health operations
   - name: dashboard
     description: Newsletter dashboard operations
+  - name: channels
+    description: Tracked YouTube channel management
 paths:
   /healthz:
     get:
@@ -67,6 +69,78 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/GmailStatus"
+
+  /channels:
+    get:
+      operationId: getChannels
+      tags: [channels]
+      summary: List tracked channels
+      description: Returns all YouTube channels configured for monitoring
+      responses:
+        "200":
+          description: List of tracked channels
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TrackedChannel"
+    post:
+      operationId: createChannel
+      tags: [channels]
+      summary: Add a tracked channel
+      description: Adds a new YouTube channel to the monitoring list
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateChannelBody"
+      responses:
+        "201":
+          description: Channel created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrackedChannel"
+        "409":
+          description: Channel already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "400":
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /channels/{id}:
+    delete:
+      operationId: deleteChannel
+      tags: [channels]
+      summary: Remove a tracked channel
+      description: Removes a YouTube channel from the monitoring list
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Channel deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrackedChannel"
+        "404":
+          description: Channel not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /dashboard/summary:
     get:
@@ -164,6 +238,37 @@ components:
         - date
         - found
         - unavailable
+
+    TrackedChannel:
+      type: object
+      properties:
+        id:
+          type: integer
+        displayName:
+          type: string
+        youtubeHandle:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - displayName
+        - youtubeHandle
+        - createdAt
+
+    CreateChannelBody:
+      type: object
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+        youtubeHandle:
+          type: string
+          minLength: 1
+      required:
+        - displayName
+        - youtubeHandle
 
     DashboardSummary:
       type: object

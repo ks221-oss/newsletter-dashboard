@@ -6,10 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './createChannelBody';
 export * from './dashboardSummary';
 export * from './errorResponse';
 export * from './gmailStatus';
 export * from './healthStatus';
 export * from './runRecord';
 export * from './runsData';
+export * from './trackedChannel';
 export * from './videoRecord';
