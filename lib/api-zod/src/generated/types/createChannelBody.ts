@@ -11,4 +11,6 @@ export interface CreateChannelBody {
   displayName: string;
   /** @minLength 1 */
   youtubeHandle: string;
+  /** Optional exact channel name string as reported by the VPS scraper */
+  scraperName?: string | null;
 }

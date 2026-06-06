@@ -57,6 +57,7 @@ export const GetChannelsResponseItem = zod.object({
   "id": zod.number(),
   "displayName": zod.string(),
   "youtubeHandle": zod.string(),
+  "scraperName": zod.string().nullable().describe('Exact channel name string reported by the VPS scraper (used to match against telemetry data)'),
   "createdAt": zod.coerce.date()
 })
 export const GetChannelsResponse = zod.array(GetChannelsResponseItem)
@@ -72,7 +73,29 @@ export const GetChannelsResponse = zod.array(GetChannelsResponseItem)
 
 export const CreateChannelBody = zod.object({
   "displayName": zod.string().min(1),
-  "youtubeHandle": zod.string().min(1)
+  "youtubeHandle": zod.string().min(1),
+  "scraperName": zod.string().nullish().describe('Optional exact channel name string as reported by the VPS scraper')
+})
+
+
+/**
+ * Updates mutable fields (currently scraperName) on a tracked channel
+ * @summary Update a tracked channel
+ */
+export const UpdateChannelParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateChannelBody = zod.object({
+  "scraperName": zod.string().nullish().describe('Exact channel name string reported by the VPS scraper; set to null to clear')
+})
+
+export const UpdateChannelResponse = zod.object({
+  "id": zod.number(),
+  "displayName": zod.string(),
+  "youtubeHandle": zod.string(),
+  "scraperName": zod.string().nullable().describe('Exact channel name string reported by the VPS scraper (used to match against telemetry data)'),
+  "createdAt": zod.coerce.date()
 })
 
 
@@ -88,6 +111,7 @@ export const DeleteChannelResponse = zod.object({
   "id": zod.number(),
   "displayName": zod.string(),
   "youtubeHandle": zod.string(),
+  "scraperName": zod.string().nullable().describe('Exact channel name string reported by the VPS scraper (used to match against telemetry data)'),
   "createdAt": zod.coerce.date()
 })
 

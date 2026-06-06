@@ -117,6 +117,42 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
 
   /channels/{id}:
+    patch:
+      operationId: updateChannel
+      tags: [channels]
+      summary: Update a tracked channel
+      description: Updates mutable fields (currently scraperName) on a tracked channel
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateChannelBody"
+      responses:
+        "200":
+          description: Channel updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrackedChannel"
+        "404":
+          description: Channel not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "400":
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
     delete:
       operationId: deleteChannel
       tags: [channels]
@@ -248,6 +284,10 @@ components:
           type: string
         youtubeHandle:
           type: string
+        scraperName:
+          type: string
+          nullable: true
+          description: Exact channel name string reported by the VPS scraper (used to match against telemetry data)
         createdAt:
           type: string
           format: date-time
@@ -255,6 +295,7 @@ components:
         - id
         - displayName
         - youtubeHandle
+        - scraperName
         - createdAt
 
     CreateChannelBody:
@@ -266,9 +307,21 @@ components:
         youtubeHandle:
           type: string
           minLength: 1
+        scraperName:
+          type: string
+          nullable: true
+          description: Optional exact channel name string as reported by the VPS scraper
       required:
         - displayName
         - youtubeHandle
+
+    UpdateChannelBody:
+      type: object
+      properties:
+        scraperName:
+          type: string
+          nullable: true
+          description: Exact channel name string reported by the VPS scraper; set to null to clear
 
     DashboardSummary:
       type: object

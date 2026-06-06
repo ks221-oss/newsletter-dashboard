@@ -36,10 +36,12 @@ export default function Timeline({ runsData }: TimelineProps) {
       }
     }
 
-    // Merge with stored tracked channels so newly-added channels appear as NO_DROP
+    // Merge with stored tracked channels.
+    // Use scraperName (exact match) when set, fall back to displayName.
     if (storedChannels) {
       for (const ch of storedChannels) {
-        channelSet.add(ch.displayName);
+        const matchKey = ch.scraperName?.trim() || ch.displayName;
+        channelSet.add(matchKey);
       }
     }
 

@@ -7,5 +7,6 @@ export type {
   RunRecord,
   RunsData,
   TrackedChannel,
+  UpdateChannelBody,
   VideoRecord,
 } from "./generated/types";

@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, trackedChannels } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { CreateChannelBody, DeleteChannelParams } from "@workspace/api-zod";
+import { CreateChannelBody, DeleteChannelParams, UpdateChannelBody } from "@workspace/api-zod";
 
 const router: IRouter = Router();
 
@@ -31,6 +31,7 @@ router.post("/channels", async (req, res): Promise<void> => {
       .values({
         displayName: body.data.displayName,
         youtubeHandle: body.data.youtubeHandle,
+        scraperName: body.data.scraperName ?? null,
       })
       .returning();
     res.status(201).json(created);
@@ -42,6 +43,36 @@ router.post("/channels", async (req, res): Promise<void> => {
     }
     req.log.error({ err }, "Failed to create channel");
     res.status(500).json({ error: "Failed to create channel" });
+  }
+});
+
+router.patch("/channels/:id", async (req, res): Promise<void> => {
+  const params = DeleteChannelParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "Invalid channel id" });
+    return;
+  }
+
+  const body = UpdateChannelBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+
+  try {
+    const [updated] = await db
+      .update(trackedChannels)
+      .set({ scraperName: body.data.scraperName ?? null })
+      .where(eq(trackedChannels.id, params.data.id))
+      .returning();
+    if (!updated) {
+      res.status(404).json({ error: "Channel not found" });
+      return;
+    }
+    res.json(updated);
+  } catch (err) {
+    req.log.error({ err }, "Failed to update channel");
+    res.status(500).json({ error: "Failed to update channel" });
   }
 });
 

@@ -14,4 +14,5 @@ export * from './healthStatus';
 export * from './runRecord';
 export * from './runsData';
 export * from './trackedChannel';
+export * from './updateChannelBody';
 export * from './videoRecord';

@@ -26,7 +26,8 @@ import type {
   GmailStatus,
   HealthStatus,
   RunsData,
-  TrackedChannel
+  TrackedChannel,
+  UpdateChannelBody
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -423,6 +424,79 @@ export const useCreateChannel = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getCreateChannelMutationOptions(options));
+    }
+
+export const getUpdateChannelUrl = (id: number,) => {
+
+
+
+
+  return `/api/channels/${id}`
+}
+
+/**
+ * Updates mutable fields (currently scraperName) on a tracked channel
+ * @summary Update a tracked channel
+ */
+export const updateChannel = async (id: number,
+    updateChannelBody: UpdateChannelBody, options?: RequestInit): Promise<TrackedChannel> => {
+
+  return customFetch<TrackedChannel>(getUpdateChannelUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateChannelBody,)
+  }
+);}
+
+
+
+
+export const getUpdateChannelMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateChannel>>, TError,{id: number;data: BodyType<UpdateChannelBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateChannel>>, TError,{id: number;data: BodyType<UpdateChannelBody>}, TContext> => {
+
+const mutationKey = ['updateChannel'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateChannel>>, {id: number;data: BodyType<UpdateChannelBody>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateChannel(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateChannelMutationResult = NonNullable<Awaited<ReturnType<typeof updateChannel>>>
+    export type UpdateChannelMutationBody = BodyType<UpdateChannelBody>
+    export type UpdateChannelMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Update a tracked channel
+ */
+export const useUpdateChannel = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateChannel>>, TError,{id: number;data: BodyType<UpdateChannelBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateChannel>>,
+        TError,
+        {id: number;data: BodyType<UpdateChannelBody>},
+        TContext
+      > => {
+      return useMutation(getUpdateChannelMutationOptions(options));
     }
 
 export const getDeleteChannelUrl = (id: number,) => {

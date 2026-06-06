@@ -49,6 +49,8 @@ export interface TrackedChannel {
   id: number;
   displayName: string;
   youtubeHandle: string;
+  /** Exact channel name string reported by the VPS scraper (used to match against telemetry data) */
+  scraperName: string | null;
   createdAt: string;
 }
 
@@ -57,6 +59,13 @@ export interface CreateChannelBody {
   displayName: string;
   /** @minLength 1 */
   youtubeHandle: string;
+  /** Optional exact channel name string as reported by the VPS scraper */
+  scraperName?: string | null;
+}
+
+export interface UpdateChannelBody {
+  /** Exact channel name string reported by the VPS scraper; set to null to clear */
+  scraperName?: string | null;
 }
 
 export interface DashboardSummary {
