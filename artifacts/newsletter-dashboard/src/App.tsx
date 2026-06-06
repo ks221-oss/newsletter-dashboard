@@ -98,6 +98,7 @@ function ClerkQueryClientCacheInvalidator() {
       const userId = user?.id ?? null;
       if (
         prevUserIdRef.current !== undefined &&
+        prevUserIdRef.current !== null &&
         prevUserIdRef.current !== userId
       ) {
         qc.clear();
