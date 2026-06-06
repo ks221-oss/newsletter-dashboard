@@ -1,31 +1,20 @@
 import React from "react";
-import { useGetDashboardRuns, useGetDashboardSummary } from "@workspace/api-client-react";
-import SummaryCards from "@/components/dashboard/summary-cards";
+import { useGetDashboardRuns } from "@workspace/api-client-react";
+import DailyCharts from "@/components/dashboard/daily-charts";
 import Timeline from "@/components/dashboard/timeline";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Dashboard() {
-  const { 
-    data: runsData, 
-    isLoading: isRunsLoading, 
+  const {
+    data: runsData,
+    isLoading: isRunsLoading,
     error: runsError,
-    isRefetching: isRunsRefetching
+    isRefetching: isRunsRefetching,
   } = useGetDashboardRuns({
-    query: { refetchInterval: 60000 }
+    query: { refetchInterval: 60000 },
   });
-
-  const { 
-    data: summaryData, 
-    isLoading: isSummaryLoading,
-    error: summaryError 
-  } = useGetDashboardSummary({
-    query: { refetchInterval: 60000 }
-  });
-
-  const isLoading = isRunsLoading || isSummaryLoading;
-  const error = runsError || summaryError;
 
   return (
     <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-8 pb-20">
@@ -50,7 +39,7 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {error ? (
+      {runsError ? (
         <Alert variant="destructive" className="bg-destructive/10 border-destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>System Error</AlertTitle>
@@ -58,13 +47,11 @@ export default function Dashboard() {
             Failed to fetch dashboard telemetry. Retrying in 60s.
           </AlertDescription>
         </Alert>
-      ) : isLoading ? (
+      ) : isRunsLoading ? (
         <div className="space-y-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Skeleton className="h-24 w-full bg-muted" />
-            <Skeleton className="h-24 w-full bg-muted" />
-            <Skeleton className="h-24 w-full bg-muted" />
-            <Skeleton className="h-24 w-full bg-muted" />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Skeleton className="h-[240px] w-full bg-muted" />
+            <Skeleton className="h-[240px] w-full bg-muted" />
           </div>
           <div className="space-y-4">
             <Skeleton className="h-16 w-full bg-muted" />
@@ -72,18 +59,25 @@ export default function Dashboard() {
             <Skeleton className="h-16 w-full bg-muted" />
           </div>
         </div>
-      ) : (
+      ) : runsData ? (
         <>
-          <SummaryCards summary={summaryData} />
-          
+          {/* Charts section */}
+          <div className="space-y-3">
+            <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase border-b border-border pb-2">
+              METRICS_GRAPH
+            </h2>
+            <DailyCharts runsData={runsData} />
+          </div>
+
+          {/* Timeline */}
           <div className="space-y-4">
-            <h2 className="text-sm font-bold tracking-widest text-muted-foreground uppercase border-b border-border pb-2">
+            <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase border-b border-border pb-2">
               TELEMETRY_LOG
             </h2>
             <Timeline runsData={runsData} />
           </div>
         </>
-      )}
+      ) : null}
     </div>
   );
 }

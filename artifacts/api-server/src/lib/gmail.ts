@@ -43,6 +43,10 @@ export async function checkGmail(dateStr: string): Promise<boolean | null> {
     logger: false,
   });
 
+  client.on("error", (err) => {
+    logger.warn({ err }, "ImapFlow socket error (suppressed)");
+  });
+
   try {
     await client.connect();
 

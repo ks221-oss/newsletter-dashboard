@@ -2,7 +2,6 @@ import React, { useMemo } from "react";
 import { RunsData, RunRecord } from "@workspace/api-client-react/src/generated/api.schemas";
 import DayRow from "./day-row";
 import WeekGroup from "./week-group";
-import { getISOWeekKey } from "@/lib/date-utils";
 import { Empty } from "@/components/ui/empty";
 import { Database } from "lucide-react";
 
@@ -10,28 +9,44 @@ interface TimelineProps {
   runsData?: RunsData;
 }
 
+function getISOWeekStart(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00Z");
+  const day = d.getUTCDay(); // 0=Sun
+  const diff = (day === 0 ? -6 : 1 - day);
+  d.setUTCDate(d.getUTCDate() + diff);
+  return d.toISOString().slice(0, 10);
+}
+
 export default function Timeline({ runsData }: TimelineProps) {
-  const { recentDays, groupedWeeks } = useMemo(() => {
-    if (!runsData) return { recentDays: [], groupedWeeks: [] };
+  const { allChannels, recentDays, groupedWeeks } = useMemo(() => {
+    if (!runsData) return { allChannels: [], recentDays: [], groupedWeeks: [] };
+
+    // Derive all known channels from full dataset
+    const channelSet = new Set<string>();
+    for (const runs of Object.values(runsData)) {
+      for (const run of runs) {
+        for (const v of run.videos) {
+          if (v.channel) channelSet.add(v.channel);
+        }
+      }
+    }
+    const allChannels = Array.from(channelSet).sort();
 
     // Sort dates descending
     const sortedDates = Object.keys(runsData).sort((a, b) => b.localeCompare(a));
-    
-    // Take the last run for each date
-    const dailyRuns = sortedDates.map(date => {
-      const runs = runsData[date];
-      return {
-        date,
-        run: runs[runs.length - 1] // Last run of the day
-      };
-    });
 
-    const recentDays = dailyRuns.slice(0, 5);
-    const olderDays = dailyRuns.slice(5);
+    // All runs for each date
+    const dailyEntries = sortedDates.map((date) => ({
+      date,
+      runs: runsData[date] ?? [],
+    }));
+
+    const recentDays = dailyEntries.slice(0, 5);
+    const olderDays = dailyEntries.slice(5);
 
     // Group older days by ISO week
     const weekGroups = olderDays.reduce((acc, curr) => {
-      const weekKey = getISOWeekKey(curr.date);
+      const weekKey = getISOWeekStart(curr.date);
       if (!acc[weekKey]) acc[weekKey] = [];
       acc[weekKey].push(curr);
       return acc;
@@ -41,7 +56,7 @@ export default function Timeline({ runsData }: TimelineProps) {
       .map(([weekKey, days]) => ({ weekKey, days }))
       .sort((a, b) => b.weekKey.localeCompare(a.weekKey));
 
-    return { recentDays, groupedWeeks };
+    return { allChannels, recentDays, groupedWeeks };
   }, [runsData]);
 
   if (!recentDays.length && !groupedWeeks.length) {
@@ -58,8 +73,8 @@ export default function Timeline({ runsData }: TimelineProps) {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        {recentDays.map(({ date, run }) => (
-          <DayRow key={date} date={date} run={run} isRecent={true} />
+        {recentDays.map(({ date, runs }) => (
+          <DayRow key={date} date={date} runs={runs} allChannels={allChannels} isRecent={true} />
         ))}
       </div>
 
@@ -70,7 +85,7 @@ export default function Timeline({ runsData }: TimelineProps) {
           </h3>
           <div className="space-y-2">
             {groupedWeeks.map(({ weekKey, days }) => (
-              <WeekGroup key={weekKey} weekKey={weekKey} days={days} />
+              <WeekGroup key={weekKey} weekKey={weekKey} days={days} allChannels={allChannels} />
             ))}
           </div>
         </div>
