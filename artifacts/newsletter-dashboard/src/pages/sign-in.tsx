@@ -7,10 +7,10 @@ export default function SignInPage() {
     <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-background px-4 gap-8">
       <div className="text-center space-y-1">
         <h1 className="text-2xl font-bold tracking-tight text-primary uppercase">
-          MISSION_CONTROL
+          AI Podcast Digest
         </h1>
         <p className="text-xs text-muted-foreground tracking-widest uppercase">
-          AI Podcast Digest · Operations Dashboard
+          Operations Dashboard
         </p>
         <p className="text-xs text-muted-foreground/60 tracking-wide pt-1">
           @together.fund accounts only

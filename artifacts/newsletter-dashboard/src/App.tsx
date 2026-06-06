@@ -170,10 +170,10 @@ function SignInPage() {
     <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-background px-4 gap-8">
       <div className="text-center space-y-1">
         <h1 className="text-2xl font-bold tracking-tight text-primary uppercase">
-          MISSION_CONTROL
+          AI Podcast Digest
         </h1>
         <p className="text-xs text-muted-foreground tracking-widest uppercase">
-          AI Podcast Digest · Operations Dashboard
+          Operations Dashboard
         </p>
         <p className="text-xs text-muted-foreground/60 pt-1">
           @together.fund accounts only
@@ -214,13 +214,13 @@ function ClerkProviderWithRoutes() {
       localization={{
         signIn: {
           start: {
-            title: "MISSION_CONTROL",
+            title: "AI Podcast Digest",
             subtitle: "Sign in with your @together.fund account",
           },
         },
         signUp: {
           start: {
-            title: "MISSION_CONTROL",
+            title: "AI Podcast Digest",
             subtitle: "Access restricted to @together.fund",
           },
         },

@@ -24,9 +24,9 @@ export default function Dashboard() {
       <div className="flex-1 min-w-0 p-4 md:p-8 space-y-8 pb-20">
         <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border pb-6">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-primary uppercase">MISSION_CONTROL</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-primary uppercase">AI Podcast Digest</h1>
             <p className="text-muted-foreground text-sm mt-1 uppercase tracking-widest">
-              AI Podcast Digest • Operations Dashboard
+              Operations Dashboard
             </p>
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono">
