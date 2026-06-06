@@ -1,5 +1,7 @@
 export * from "./generated/api";
 export type {
+  ChannelValidation,
+  ChannelVideo,
   DashboardSummary,
   ErrorResponse,
   GmailStatus,
@@ -7,6 +9,6 @@ export type {
   RunRecord,
   RunsData,
   TrackedChannel,
-  UpdateChannelBody,
+  ValidateChannelParams,
   VideoRecord,
 } from "./generated/types";

@@ -20,6 +20,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  ChannelValidation,
   CreateChannelBody,
   DashboardSummary,
   ErrorResponse,
@@ -27,7 +28,8 @@ import type {
   HealthStatus,
   RunsData,
   TrackedChannel,
-  UpdateChannelBody
+  UpdateChannelBody,
+  ValidateChannelParams
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -425,6 +427,91 @@ export const useCreateChannel = <TError = ErrorType<ErrorResponse>,
       > => {
       return useMutation(getCreateChannelMutationOptions(options));
     }
+
+export const getValidateChannelUrl = (params: ValidateChannelParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/channels/validate?${stringifiedParams}` : `/api/channels/validate`
+}
+
+/**
+ * Resolves the channel name and fetches recent videos via YouTube RSS. Returns videos from the last 14 days, falling back to 90 days if none found.
+ * @summary Validate a YouTube channel before adding
+ */
+export const validateChannel = async (params: ValidateChannelParams, options?: RequestInit): Promise<ChannelValidation> => {
+
+  return customFetch<ChannelValidation>(getValidateChannelUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getValidateChannelQueryKey = (params?: ValidateChannelParams,) => {
+    return [
+    `/api/channels/validate`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getValidateChannelQueryOptions = <TData = Awaited<ReturnType<typeof validateChannel>>, TError = ErrorType<ErrorResponse>>(params: ValidateChannelParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof validateChannel>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getValidateChannelQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof validateChannel>>> = ({ signal }) => validateChannel(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof validateChannel>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ValidateChannelQueryResult = NonNullable<Awaited<ReturnType<typeof validateChannel>>>
+export type ValidateChannelQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Validate a YouTube channel before adding
+ */
+
+export function useValidateChannel<TData = Awaited<ReturnType<typeof validateChannel>>, TError = ErrorType<ErrorResponse>>(
+ params: ValidateChannelParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof validateChannel>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getValidateChannelQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getUpdateChannelUrl = (id: number,) => {
 

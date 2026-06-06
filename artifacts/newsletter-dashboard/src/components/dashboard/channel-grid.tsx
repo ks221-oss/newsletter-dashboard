@@ -5,8 +5,10 @@ import {
   useUpdateChannel,
   useDeleteChannel,
   useGetDashboardRuns,
+  useValidateChannel,
   getGetChannelsQueryKey,
   getGetDashboardRunsQueryKey,
+  getValidateChannelQueryKey,
   RunsData,
   VideoRecord,
   TrackedChannel,
@@ -22,6 +24,7 @@ import {
   ChevronUp,
   CheckCircle2,
   Search,
+  ExternalLink,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -43,7 +46,13 @@ function parseYouTubeInput(raw: string): string {
   return trimmed;
 }
 
+/** Returns true for raw YouTube channel IDs like UCf_KhBXw5TIV0A7butjgFhg */
+function isChannelId(handle: string): boolean {
+  return /^UC[\w-]{22}$/.test(handle);
+}
+
 function suggestDisplayName(handle: string): string {
+  if (isChannelId(handle)) return ""; // never guess names from opaque channel IDs
   const base = handle.replace(/^@/, "").replace(/[-_]/g, " ");
   return base
     .split(" ")
@@ -348,9 +357,12 @@ export default function ChannelGrid() {
   const [filterQuery, setFilterQuery] = useState("");
   const [filterTab, setFilterTab] = useState<FilterTab>("all");
   const [addState, setAddState] = useState<AddState>({ kind: "idle" });
+  const [debouncedHandle, setDebouncedHandle] = useState("");
 
   // Capture current parsedHandle in a ref for use inside mutation callbacks
   const pendingHandleRef = useRef<string>("");
+  // Track whether the user has manually typed in the display name field
+  const userEditedNameRef = useRef(false);
 
   const { data: channels, isLoading } = useGetChannels({
     query: { queryKey: getGetChannelsQueryKey() },
@@ -432,8 +444,44 @@ export default function ChannelGrid() {
   const inferredName = parsedHandle ? suggestDisplayName(parsedHandle) : "";
   const effectiveName = displayName.trim() || inferredName;
 
+  // Debounce: only fire the validation query 700 ms after the user stops typing
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    if (!parsedHandle) { setDebouncedHandle(""); return; }
+    debounceTimerRef.current = setTimeout(() => setDebouncedHandle(parsedHandle), 700);
+    return () => { if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current); };
+  }, [parsedHandle]);
+
+  // Validate the channel via YouTube RSS — fires once debounce settles
+  const {
+    data: validation,
+    isFetching: validating,
+    error: validationError,
+  } = useValidateChannel(
+    { handle: debouncedHandle },
+    {
+      query: {
+        queryKey: getValidateChannelQueryKey({ handle: debouncedHandle }),
+        enabled: !!debouncedHandle,
+        staleTime: 60_000,
+        retry: false,
+        gcTime: 5 * 60 * 1000,
+      },
+    },
+  );
+
+  // Auto-fill display name from YouTube RSS channel name when validation succeeds
+  useEffect(() => {
+    if (validation?.channelName && !userEditedNameRef.current) {
+      setDisplayName(validation.channelName);
+      setNameOverrideOpen(true);
+    }
+  }, [validation]);
+
   function handleUrlChange(e: React.ChangeEvent<HTMLInputElement>) {
     setUrlInput(e.target.value);
+    userEditedNameRef.current = false;
     if (addState.kind !== "idle") setAddState({ kind: "idle" });
     if (!nameOverrideOpen) setDisplayName("");
   }
@@ -454,14 +502,26 @@ export default function ChannelGrid() {
     setDisplayName("");
     setNameOverrideOpen(false);
     setAddState({ kind: "idle" });
+    setDebouncedHandle("");
+    userEditedNameRef.current = false;
   }
 
   const isDuplicateInline =
     !!parsedHandle &&
     !!channels?.some((ch) => ch.youtubeHandle.toLowerCase() === parsedHandle.toLowerCase());
 
+  // Still waiting for the debounce timer to fire
+  const isDebouncing = !!parsedHandle && parsedHandle !== debouncedHandle;
+
   const canSubmit =
-    !!parsedHandle && !!effectiveName && addState.kind !== "adding" && !isDuplicateInline;
+    !!parsedHandle &&
+    !!effectiveName &&
+    addState.kind !== "adding" &&
+    !isDuplicateInline &&
+    !isDebouncing &&
+    !validating &&
+    !!validation &&
+    !validationError;
 
   // Derive status per channel
   function channelStatus(ch: TrackedChannel): ChannelStatus {
@@ -547,46 +607,112 @@ export default function ChannelGrid() {
         {/* Adding progress */}
         {addState.kind === "adding" && <AddingProgressBar />}
 
-        {/* Channel identified / confirmation feedback */}
+        {/* Validation status panel */}
         {parsedHandle && addState.kind === "idle" && !isDuplicateInline && (
-          <div className="flex items-center gap-2 px-3 py-2 border border-border/40 bg-muted/20 text-[10px] font-mono">
-            <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
-            <span className="text-emerald-400">Channel identified</span>
-            <span className="text-muted-foreground/40">·</span>
-            <span className="text-muted-foreground/60 truncate">{parsedHandle}</span>
-            <span className="text-muted-foreground/40">·</span>
-            <span className="text-muted-foreground/40 uppercase tracking-wider text-[9px]">Auto-inferred name</span>
-            {!nameOverrideOpen && (
-              <span className="ml-1 px-2 py-0.5 bg-primary/10 border border-primary/30 text-primary text-[10px] truncate max-w-[120px]">
-                {effectiveName}
-              </span>
+          <>
+            {/* Debouncing — still typing */}
+            {isDebouncing && (
+              <div className="flex items-center gap-2 px-3 py-1.5 border border-border/20 bg-muted/5 text-[10px] font-mono text-muted-foreground/30">
+                <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+                <span>Identifying channel…</span>
+              </div>
             )}
-            {!nameOverrideOpen && (
-              <button
-                type="button"
-                onClick={() => setNameOverrideOpen(true)}
-                className="ml-auto text-[9px] text-muted-foreground/40 hover:text-muted-foreground transition-colors shrink-0 uppercase tracking-wider"
-              >
-                Override
-              </button>
+
+            {/* Fetching RSS from YouTube */}
+            {!isDebouncing && validating && (
+              <div className="flex items-center gap-2 px-3 py-2 border border-border/40 bg-muted/20 text-[10px] font-mono text-muted-foreground/60">
+                <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+                <span>Validating channel via YouTube RSS…</span>
+              </div>
             )}
-          </div>
+
+            {/* Validation failed */}
+            {!isDebouncing && !validating && validationError && (
+              <div className="flex items-start gap-2 px-3 py-2 border border-red-500/30 bg-red-500/5 text-[10px] font-mono">
+                <AlertCircle className="w-3 h-3 text-red-400 shrink-0 mt-0.5" />
+                <div>
+                  <div className="text-red-400 font-semibold">Channel validation failed</div>
+                  <div className="text-red-400/60 mt-0.5">
+                    {((validationError as { data?: { error?: string } })?.data?.error) ?? "Could not reach YouTube — try again"}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Validation success: channel name + video list */}
+            {!isDebouncing && !validating && validation && (
+              <div className="border border-emerald-500/20 bg-emerald-500/5">
+                <div className="flex items-center gap-2 px-3 py-2 border-b border-emerald-500/15">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                  <span className="text-[10px] font-mono text-emerald-400 font-semibold truncate">
+                    {validation.channelName ?? parsedHandle}
+                  </span>
+                  <span className="text-muted-foreground/25 text-[10px] shrink-0">·</span>
+                  <span className="text-[9px] font-mono text-muted-foreground/50 uppercase tracking-wider shrink-0">
+                    {validation.videos.length} video{validation.videos.length !== 1 ? "s" : ""}
+                    {" / last "}{validation.lookbackDays}d
+                  </span>
+                  {validation.lookbackDays === 90 && (
+                    <span className="ml-auto text-[8px] font-mono text-amber-400/60 uppercase tracking-wider shrink-0">
+                      quiet last 14d
+                    </span>
+                  )}
+                </div>
+                <div className="divide-y divide-border/15 max-h-48 overflow-y-auto">
+                  {validation.videos.slice(0, 10).map((v, i) => (
+                    <div key={i} className="flex items-center gap-2 px-3 py-1.5 hover:bg-muted/10 transition-colors">
+                      <span className="text-[9px] font-mono text-muted-foreground/25 tabular-nums w-4 shrink-0 text-right">
+                        {i + 1}
+                      </span>
+                      <span className="flex-1 text-[10px] font-mono text-foreground/65 truncate">
+                        {v.title}
+                      </span>
+                      <span className="text-[9px] font-mono text-muted-foreground/35 shrink-0">
+                        {new Date(v.publishedAt).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </span>
+                      <a
+                        href={v.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-muted-foreground/25 hover:text-primary transition-colors shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
 
-        {nameOverrideOpen && (
+        {/* Display name — auto-opened + filled by validation; user can still edit */}
+        {nameOverrideOpen && addState.kind === "idle" && (
           <div className="flex items-center gap-2">
+            <div className="text-[9px] font-mono text-muted-foreground/40 uppercase tracking-wider shrink-0">Name</div>
             <input
               type="text"
               placeholder={inferredName || "Display name"}
               value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
+              onChange={(e) => {
+                setDisplayName(e.target.value);
+                userEditedNameRef.current = true;
+              }}
               className="flex-1 bg-background border border-primary/40 px-3 py-1.5 text-[12px] font-mono text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary rounded-none"
-              autoFocus
             />
             <button
               type="button"
-              onClick={() => { setDisplayName(""); setNameOverrideOpen(false); }}
-              className="text-[10px] font-mono text-muted-foreground hover:text-foreground transition-colors px-2 py-1.5 border border-border"
+              onClick={() => {
+                const reset = validation?.channelName ?? "";
+                setDisplayName(reset);
+                userEditedNameRef.current = false;
+                if (!reset) setNameOverrideOpen(false);
+              }}
+              className="text-[10px] font-mono text-muted-foreground hover:text-foreground transition-colors px-2 py-1.5 border border-border shrink-0"
             >
               Reset
             </button>

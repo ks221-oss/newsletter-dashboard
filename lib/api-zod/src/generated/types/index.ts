@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './channelValidation';
+export * from './channelVideo';
 export * from './createChannelBody';
 export * from './dashboardSummary';
 export * from './errorResponse';
@@ -15,4 +17,5 @@ export * from './runRecord';
 export * from './runsData';
 export * from './trackedChannel';
 export * from './updateChannelBody';
+export * from './validateChannelParams';
 export * from './videoRecord';

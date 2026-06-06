@@ -68,6 +68,22 @@ export interface UpdateChannelBody {
   scraperName?: string | null;
 }
 
+export interface ChannelVideo {
+  title: string;
+  url: string;
+  publishedAt: string;
+}
+
+export interface ChannelValidation {
+  /** Real display name resolved from YouTube RSS feed */
+  channelName: string | null;
+  /** Resolved channel ID (UCxxxxxx) used to fetch RSS */
+  youtubeHandle: string;
+  /** Window used — 14 if videos found in last 14 days, otherwise 90 */
+  lookbackDays: number;
+  videos: ChannelVideo[];
+}
+
 export interface DashboardSummary {
   totalRuns: number;
   last30DaysRuns: number;
@@ -76,4 +92,12 @@ export interface DashboardSummary {
   last30DaysTranscriptRate: number;
   totalVideosProcessed: number;
 }
+
+export type ValidateChannelParams = {
+/**
+ * Parsed YouTube handle (e.g. @SemiAnalysis) or channel ID (e.g. UCxxxxxx)
+ * @minLength 1
+ */
+handle: string;
+};
 

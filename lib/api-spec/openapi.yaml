@@ -116,6 +116,46 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /channels/validate:
+    get:
+      operationId: validateChannel
+      tags: [channels]
+      summary: Validate a YouTube channel before adding
+      description: Resolves the channel name and fetches recent videos via YouTube RSS. Returns videos from the last 14 days, falling back to 90 days if none found.
+      parameters:
+        - name: handle
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            description: Parsed YouTube handle (e.g. @SemiAnalysis) or channel ID (e.g. UCxxxxxx)
+      responses:
+        "200":
+          description: Channel validated with recent videos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChannelValidation"
+        "400":
+          description: Missing or invalid handle parameter
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Channel not found or no recent videos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Unable to reach YouTube
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /channels/{id}:
     patch:
       operationId: updateChannel
@@ -322,6 +362,44 @@ components:
           type: string
           nullable: true
           description: Exact channel name string reported by the VPS scraper; set to null to clear
+
+    ChannelVideo:
+      type: object
+      properties:
+        title:
+          type: string
+        url:
+          type: string
+        publishedAt:
+          type: string
+          format: date-time
+      required:
+        - title
+        - url
+        - publishedAt
+
+    ChannelValidation:
+      type: object
+      properties:
+        channelName:
+          type: string
+          nullable: true
+          description: Real display name resolved from YouTube RSS feed
+        youtubeHandle:
+          type: string
+          description: Resolved channel ID (UCxxxxxx) used to fetch RSS
+        lookbackDays:
+          type: integer
+          description: Window used — 14 if videos found in last 14 days, otherwise 90
+        videos:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChannelVideo"
+      required:
+        - channelName
+        - youtubeHandle
+        - lookbackDays
+        - videos
 
     DashboardSummary:
       type: object

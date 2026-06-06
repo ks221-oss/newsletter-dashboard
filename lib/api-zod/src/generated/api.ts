@@ -79,6 +79,29 @@ export const CreateChannelBody = zod.object({
 
 
 /**
+ * Resolves the channel name and fetches recent videos via YouTube RSS. Returns videos from the last 14 days, falling back to 90 days if none found.
+ * @summary Validate a YouTube channel before adding
+ */
+
+
+
+export const ValidateChannelQueryParams = zod.object({
+  "handle": zod.coerce.string().min(1)
+})
+
+export const ValidateChannelResponse = zod.object({
+  "channelName": zod.string().nullable().describe('Real display name resolved from YouTube RSS feed'),
+  "youtubeHandle": zod.string().describe('Resolved channel ID (UCxxxxxx) used to fetch RSS'),
+  "lookbackDays": zod.number().describe('Window used — 14 if videos found in last 14 days, otherwise 90'),
+  "videos": zod.array(zod.object({
+  "title": zod.string(),
+  "url": zod.string(),
+  "publishedAt": zod.coerce.date()
+}))
+})
+
+
+/**
  * Updates mutable fields (currently scraperName) on a tracked channel
  * @summary Update a tracked channel
  */
