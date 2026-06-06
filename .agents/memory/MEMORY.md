@@ -1,0 +1,1 @@
+- [Clerk Auth setup](clerk-auth-setup.md) — Replit-managed Clerk provisioned; domain lock to @together.fund enforced on both frontend (DomainGuard) and backend (requireAuth middleware with 5-min cache).

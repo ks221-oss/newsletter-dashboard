@@ -86,7 +86,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Side pane ── */}
-      <aside className="hidden lg:flex flex-col w-72 xl:w-80 border-l border-border shrink-0 sticky top-0 h-screen overflow-y-auto">
+      <aside className="hidden md:flex flex-col w-72 xl:w-80 border-l border-border shrink-0 sticky top-0 h-screen overflow-y-auto">
         {/* Logs */}
         <div className="flex-1 p-4 space-y-3 border-b border-border">
           <h2 className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase pb-1 border-b border-border">
@@ -113,7 +113,7 @@ export default function Dashboard() {
       </aside>
 
       {/* ── Mobile side pane (stacked below, visible on small screens) ── */}
-      <div className="lg:hidden w-full border-t border-border mt-8">
+      <div className="md:hidden w-full border-t border-border mt-8">
         <div className="p-4 space-y-3 border-b border-border">
           <h2 className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase pb-1 border-b border-border">
             Logs
