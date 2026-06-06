@@ -2,6 +2,7 @@ import React from "react";
 import { useGetDashboardRuns, getGetDashboardRunsQueryKey } from "@workspace/api-client-react";
 import DailyCharts from "@/components/dashboard/daily-charts";
 import Timeline from "@/components/dashboard/timeline";
+import SidePane from "@/components/dashboard/side-pane";
 import ChannelManager from "@/components/dashboard/channel-manager";
 import SidePaneLogs from "@/components/dashboard/side-pane-logs";
 import { AlertCircle, RefreshCw } from "lucide-react";
@@ -20,6 +21,9 @@ export default function Dashboard() {
 
   return (
     <div className="flex min-h-screen">
+      {/* ── Left side pane (desktop only) ── */}
+      <SidePane runsData={runsData} isRunsLoading={isRunsLoading} />
+
       {/* ── Main content ── */}
       <div className="flex-1 min-w-0 p-4 md:p-8 space-y-8 pb-20">
         <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border pb-6">
@@ -72,7 +76,6 @@ export default function Dashboard() {
                 <DailyCharts runsData={runsData} />
               </div>
             )}
-
             {runsData && (
               <div className="space-y-4">
                 <h2 className="text-xs font-bold tracking-widest text-muted-foreground uppercase border-b border-border pb-2">
@@ -83,48 +86,21 @@ export default function Dashboard() {
             )}
           </>
         )}
-      </div>
 
-      {/* ── Side pane ── */}
-      <aside className="hidden md:flex flex-col w-72 xl:w-80 border-l border-border shrink-0 sticky top-0 h-screen overflow-y-auto">
-        {/* Logs */}
-        <div className="flex-1 p-4 space-y-3 border-b border-border">
-          <h2 className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase pb-1 border-b border-border">
-            Logs
-          </h2>
-          {isRunsLoading ? (
-            <div className="space-y-1.5">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <Skeleton key={i} className="h-7 w-full bg-muted" />
-              ))}
-            </div>
-          ) : (
+        {/* ── Mobile: pane sections stacked below main content ── */}
+        <div className="md:hidden border-t border-border pt-6 space-y-6">
+          <div className="space-y-3">
+            <h2 className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase pb-1 border-b border-border">
+              Accounts Tracked
+            </h2>
+            <ChannelManager />
+          </div>
+          <div className="space-y-3">
+            <h2 className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase pb-1 border-b border-border">
+              Logs
+            </h2>
             <SidePaneLogs runsData={runsData} />
-          )}
-        </div>
-
-        {/* Channels tracked */}
-        <div className="p-4 space-y-3">
-          <h2 className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase pb-1 border-b border-border">
-            Channels tracked
-          </h2>
-          <ChannelManager />
-        </div>
-      </aside>
-
-      {/* ── Mobile side pane (stacked below, visible on small screens) ── */}
-      <div className="md:hidden w-full border-t border-border mt-8">
-        <div className="p-4 space-y-3 border-b border-border">
-          <h2 className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase pb-1 border-b border-border">
-            Logs
-          </h2>
-          <SidePaneLogs runsData={runsData} />
-        </div>
-        <div className="p-4 space-y-3">
-          <h2 className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase pb-1 border-b border-border">
-            Channels tracked
-          </h2>
-          <ChannelManager />
+          </div>
         </div>
       </div>
     </div>

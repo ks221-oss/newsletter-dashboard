@@ -19,6 +19,7 @@ import {
   X,
   ChevronUp,
   CheckCircle2,
+  Search,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -68,7 +69,6 @@ function AddingProgressBar() {
     startRef.current = Date.now();
     const animate = () => {
       const elapsed = Date.now() - startRef.current;
-      // Eases toward 90% over ~3s, never reaches 100 (server controls completion)
       const pct = 90 * (1 - Math.exp(-elapsed / 2800));
       setWidth(pct);
       rafRef.current = requestAnimationFrame(animate);
@@ -129,33 +129,30 @@ function ChannelRow({
 
   return (
     <div className="border border-border/50 bg-background/50 hover:border-border/80 transition-colors">
-      <div className="flex items-center justify-between px-3 py-2 gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <Youtube className="w-4 h-4 text-red-500 shrink-0" />
+      <div className="flex items-center justify-between px-3 py-2 gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <Youtube className="w-3.5 h-3.5 text-red-500 shrink-0" />
           <div className="min-w-0">
-            <div className="font-mono text-sm text-foreground truncate">
+            <div className="font-mono text-xs text-foreground truncate leading-tight">
               {ch.displayName}
             </div>
-            <div className="font-mono text-[11px] text-muted-foreground">
+            <div className="font-mono text-[10px] text-muted-foreground leading-tight">
               {ch.youtubeHandle}
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-3 shrink-0">
-          <span className="hidden sm:block text-[10px] font-mono text-muted-foreground opacity-60">
-            {formatDate(ch.createdAt)}
-          </span>
+        <div className="flex items-center gap-1.5 shrink-0">
           {ch.scraperName ? (
             <Badge
               variant="outline"
-              className="rounded-none font-mono text-[10px] border-emerald-500/30 text-emerald-400 bg-emerald-500/10"
+              className="rounded-none font-mono text-[9px] border-emerald-500/30 text-emerald-400 bg-emerald-500/10 px-1 py-0"
             >
               MAPPED
             </Badge>
           ) : (
             <Badge
               variant="outline"
-              className="rounded-none font-mono text-[10px] border-amber-500/30 text-amber-400 bg-amber-500/10"
+              className="rounded-none font-mono text-[9px] border-amber-500/30 text-amber-400 bg-amber-500/10 px-1 py-0"
             >
               NO_MAP
             </Badge>
@@ -166,9 +163,9 @@ function ChannelRow({
             title="Set scraper name"
           >
             {editingScraperName ? (
-              <ChevronUp className="w-3.5 h-3.5" />
+              <ChevronUp className="w-3 h-3" />
             ) : (
-              <Pencil className="w-3.5 h-3.5" />
+              <Pencil className="w-3 h-3" />
             )}
           </button>
           <button
@@ -177,7 +174,7 @@ function ChannelRow({
             className="p-1 text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors border border-transparent hover:border-red-500/30 disabled:opacity-50"
             title="Remove channel"
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            <Trash2 className="w-3 h-3" />
           </button>
         </div>
       </div>
@@ -259,7 +256,8 @@ export default function ChannelManager() {
   const queryClient = useQueryClient();
   const [urlInput, setUrlInput] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [nameTouched, setNameTouched] = useState(false);
+  const [nameOverrideOpen, setNameOverrideOpen] = useState(false);
+  const [filterQuery, setFilterQuery] = useState("");
   const [addState, setAddState] = useState<AddState>({ kind: "idle" });
 
   const { data: channels, isLoading } = useGetChannels({
@@ -270,12 +268,11 @@ export default function ChannelManager() {
     mutation: {
       onSuccess: (created) => {
         queryClient.invalidateQueries({ queryKey: getGetChannelsQueryKey() });
-        const handle =
-          (created as TrackedChannel).youtubeHandle ?? urlInput;
+        const handle = (created as TrackedChannel).youtubeHandle ?? urlInput;
         setAddState({ kind: "success", handle });
         setUrlInput("");
         setDisplayName("");
-        setNameTouched(false);
+        setNameOverrideOpen(false);
         setTimeout(() => setAddState({ kind: "idle" }), 3000);
       },
       onError: (err: unknown) => {
@@ -301,23 +298,25 @@ export default function ChannelManager() {
     },
   });
 
+  const parsedHandle = parseYouTubeInput(urlInput);
+  const inferredName = parsedHandle ? suggestDisplayName(parsedHandle) : "";
+  const effectiveName = displayName.trim() || inferredName;
+
   function handleUrlChange(e: React.ChangeEvent<HTMLInputElement>) {
     const val = e.target.value;
     setUrlInput(val);
     if (addState.kind !== "idle") setAddState({ kind: "idle" });
-    if (!nameTouched) {
-      const parsed = parseYouTubeInput(val);
-      if (parsed) setDisplayName(suggestDisplayName(parsed));
-      else setDisplayName("");
+    // Only reset override name if the user hasn't manually typed one
+    if (!nameOverrideOpen) {
+      setDisplayName("");
     }
   }
 
   function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     const handle = parseYouTubeInput(urlInput);
-    if (!handle || !displayName.trim()) return;
+    if (!handle || !effectiveName) return;
 
-    // Client-side duplicate check
     const exists = channels?.some(
       (ch) => ch.youtubeHandle.toLowerCase() === handle.toLowerCase(),
     );
@@ -327,10 +326,8 @@ export default function ChannelManager() {
     }
 
     setAddState({ kind: "adding" });
-    createChannel({ data: { displayName: displayName.trim(), youtubeHandle: handle } });
+    createChannel({ data: { displayName: effectiveName, youtubeHandle: handle } });
   }
-
-  const parsedHandle = parseYouTubeInput(urlInput);
 
   const isDuplicateInline =
     !!parsedHandle &&
@@ -340,14 +337,26 @@ export default function ChannelManager() {
 
   const canSubmit =
     !!parsedHandle &&
-    !!displayName.trim() &&
+    !!effectiveName &&
     addState.kind !== "adding" &&
     !isDuplicateInline;
+
+  // Filter channel list
+  const lowerFilter = filterQuery.toLowerCase();
+  const filteredChannels = channels?.filter(
+    (ch) =>
+      !filterQuery ||
+      ch.displayName.toLowerCase().includes(lowerFilter) ||
+      ch.youtubeHandle.toLowerCase().includes(lowerFilter),
+  );
+
+  const showFilter = (channels?.length ?? 0) >= 5;
 
   return (
     <div className="space-y-3">
       {/* ── Add form ── */}
       <form onSubmit={handleAdd} className="space-y-2">
+        {/* URL input */}
         <div className="relative">
           <input
             type="text"
@@ -370,23 +379,53 @@ export default function ChannelManager() {
           )}
         </div>
 
-        {parsedHandle && parsedHandle !== urlInput.trim() && !isDuplicateInline && (
-          <div className="text-[10px] font-mono text-muted-foreground px-1">
-            → <span className="text-primary">{parsedHandle}</span>
+        {/* Inferred name chip — shown when there's a parsed handle and no duplicate */}
+        {parsedHandle && !isDuplicateInline && (
+          <div className="flex items-center gap-2 px-1">
+            <span className="text-[10px] font-mono text-muted-foreground">→</span>
+            {nameOverrideOpen ? (
+              <div className="flex items-center gap-1.5 flex-1">
+                <input
+                  type="text"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder={inferredName}
+                  className="flex-1 bg-background border border-border px-2 py-1 text-[11px] font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary rounded-none"
+                  disabled={addState.kind === "adding"}
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDisplayName("");
+                    setNameOverrideOpen(false);
+                  }}
+                  className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+                  title="Use inferred name"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ) : (
+              <>
+                <span className="text-[10px] font-mono text-primary flex-1 truncate">
+                  {effectiveName}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDisplayName(inferredName);
+                    setNameOverrideOpen(true);
+                  }}
+                  className="p-0.5 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                  title="Edit display name"
+                >
+                  <Pencil className="w-2.5 h-2.5" />
+                </button>
+              </>
+            )}
           </div>
         )}
-
-        <input
-          type="text"
-          placeholder="Display name"
-          value={displayName}
-          onChange={(e) => {
-            setDisplayName(e.target.value);
-            setNameTouched(true);
-          }}
-          className="w-full bg-background border border-border px-3 py-1.5 text-[12px] font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary rounded-none"
-          disabled={addState.kind === "adding"}
-        />
 
         <button
           type="submit"
@@ -401,7 +440,6 @@ export default function ChannelManager() {
           {addState.kind === "adding" ? "Adding…" : "Add Channel"}
         </button>
 
-        {/* Progress bar — shown only while adding */}
         {addState.kind === "adding" && <AddingProgressBar />}
       </form>
 
@@ -441,6 +479,28 @@ export default function ChannelManager() {
         </div>
       )}
 
+      {/* ── Filter ── */}
+      {showFilter && !isLoading && (
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Filter channels…"
+            value={filterQuery}
+            onChange={(e) => setFilterQuery(e.target.value)}
+            className="w-full bg-background border border-border pl-7 pr-3 py-1.5 text-[11px] font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary rounded-none"
+          />
+          {filterQuery && (
+            <button
+              onClick={() => setFilterQuery("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+      )}
+
       {/* ── Channel list ── */}
       {isLoading ? (
         <div className="space-y-1.5">
@@ -452,9 +512,13 @@ export default function ChannelManager() {
         <div className="py-4 text-center text-[11px] font-mono text-muted-foreground uppercase tracking-wider border border-dashed border-border">
           No channels tracked yet — add one above
         </div>
+      ) : filteredChannels && filteredChannels.length === 0 ? (
+        <div className="py-3 text-center text-[11px] font-mono text-muted-foreground border border-dashed border-border">
+          No channels match "{filterQuery}"
+        </div>
       ) : (
         <div className="space-y-px">
-          {channels.map((ch) => (
+          {filteredChannels?.map((ch) => (
             <ChannelRow
               key={ch.id}
               ch={ch}
@@ -463,11 +527,11 @@ export default function ChannelManager() {
             />
           ))}
           <div className="text-[10px] font-mono text-muted-foreground pt-1 opacity-60">
-            {channels.length} channel{channels.length !== 1 ? "s" : ""} tracked
+            {filterQuery
+              ? `${filteredChannels?.length ?? 0} of ${channels.length} channels`
+              : `${channels.length} channel${channels.length !== 1 ? "s" : ""} tracked`}
             {" · "}
             <span className="text-amber-400">NO_MAP</span> = scraper name not set
-            {" · "}
-            <span className="text-emerald-400">MAPPED</span> = telemetry matched
           </div>
         </div>
       )}
