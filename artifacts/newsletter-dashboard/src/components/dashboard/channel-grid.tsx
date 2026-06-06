@@ -345,7 +345,7 @@ type AddState =
   | { kind: "duplicate"; handle: string }
   | { kind: "error"; message: string };
 
-type FilterTab = "all" | "active" | "idle";
+type FilterTab = "all" | "active" | "quiet" | "unmapped";
 
 // ─── Channel grid ─────────────────────────────────────────────────────────────
 
@@ -542,8 +542,9 @@ export default function ChannelGrid() {
 
   // Counts
   const allChannels = channels ?? [];
-  const activeCount = allChannels.filter((ch) => channelStatus(ch) === "active").length;
-  const idleCount = allChannels.filter((ch) => channelStatus(ch) !== "active").length;
+  const activeCount  = allChannels.filter((ch) => channelStatus(ch) === "active").length;
+  const quietCount   = allChannels.filter((ch) => channelStatus(ch) === "idle").length;
+  const unmappedCount = allChannels.filter((ch) => channelStatus(ch) === "nomap").length;
 
   // Filter
   const lowerQ = filterQuery.toLowerCase();
@@ -555,8 +556,9 @@ export default function ChannelGrid() {
   );
 
   const displayChannels = filteredBySearch.filter((ch) => {
-    if (filterTab === "active") return channelStatus(ch) === "active";
-    if (filterTab === "idle") return channelStatus(ch) !== "active";
+    if (filterTab === "active")   return channelStatus(ch) === "active";
+    if (filterTab === "quiet")    return channelStatus(ch) === "idle";
+    if (filterTab === "unmapped") return channelStatus(ch) === "nomap";
     return true;
   });
 
@@ -574,9 +576,14 @@ export default function ChannelGrid() {
             YouTube channels currently monitored for new content
           </p>
         </div>
-        {allChannels.length > 0 && (
+        {allChannels.length > 0 && activeCount > 0 && (
           <span className="shrink-0 text-[9px] font-mono px-2 py-1 border border-emerald-500/30 text-emerald-400 bg-emerald-500/10 uppercase tracking-wider whitespace-nowrap">
-            {activeCount} channel{activeCount !== 1 ? "s" : ""} active
+            {activeCount} active
+          </span>
+        )}
+        {allChannels.length > 0 && unmappedCount > 0 && (
+          <span className="shrink-0 text-[9px] font-mono px-2 py-1 border border-amber-500/30 text-amber-400 bg-amber-500/10 uppercase tracking-wider whitespace-nowrap">
+            {unmappedCount} need mapping
           </span>
         )}
       </div>
@@ -766,9 +773,10 @@ export default function ChannelGrid() {
           <div className="flex items-center border border-border/60">
             {(
               [
-                { id: "all" as FilterTab,    label: "All",    count: allChannels.length },
-                { id: "active" as FilterTab, label: "Active", count: activeCount },
-                { id: "idle" as FilterTab,   label: "Idle",   count: idleCount },
+                { id: "all"      as FilterTab, label: "All",      count: allChannels.length },
+                { id: "active"   as FilterTab, label: "Active",   count: activeCount },
+                { id: "quiet"    as FilterTab, label: "Quiet",    count: quietCount },
+                { id: "unmapped" as FilterTab, label: "Unmapped", count: unmappedCount },
               ]
             ).map(({ id, label, count }) => (
               <button
