@@ -156,12 +156,10 @@ router.post("/transcriber/summary", async (req, res): Promise<void> => {
     return;
   }
 
-  const openaiKey = process.env.OPENAI_API_KEY;
-  const openaiBaseUrl = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
 
-  if (!openaiKey && !anthropicKey) {
-    res.status(502).json({ error: "AI service not configured — set OPENAI_API_KEY or ANTHROPIC_API_KEY" });
+  if (!anthropicKey) {
+    res.status(502).json({ error: "AI service not configured — set ANTHROPIC_API_KEY" });
     return;
   }
 
@@ -172,47 +170,15 @@ router.post("/transcriber/summary", async (req, res): Promise<void> => {
   const userContent = `Title: ${body.data.title}\n\nTranscript:\n${plainText}`;
 
   try {
-    let summary = "";
-
-    if (openaiKey) {
-      // Primary: OpenAI gpt-4o-mini (via Replit proxy if available, else direct)
-      const baseURL = openaiBaseUrl ?? "https://api.openai.com/v1";
-      const chatRes = await fetch(`${baseURL}/chat/completions`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${openaiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          max_tokens: 8192,
-          messages: [
-            { role: "system", content: SUMMARY_SYSTEM_PROMPT },
-            { role: "user", content: userContent },
-          ],
-        }),
-        signal: AbortSignal.timeout(60000),
-      });
-      if (!chatRes.ok) {
-        const err = await chatRes.text();
-        throw new Error(`OpenAI returned ${chatRes.status}: ${err.slice(0, 200)}`);
-      }
-      const data = (await chatRes.json()) as {
-        choices: Array<{ message: { content: string } }>;
-      };
-      summary = data.choices[0]?.message?.content ?? "";
-    } else {
-      // Fallback: Anthropic Claude (user-provided key)
-      const client = new Anthropic({ apiKey: anthropicKey! });
-      const message = await client.messages.create({
-        model: "claude-sonnet-4-6",
-        max_tokens: 8192,
-        system: SUMMARY_SYSTEM_PROMPT,
-        messages: [{ role: "user", content: userContent }],
-      });
-      const block = message.content[0];
-      summary = block.type === "text" ? block.text : "";
-    }
+    const client = new Anthropic({ apiKey: anthropicKey });
+    const message = await client.messages.create({
+      model: "claude-sonnet-4-5",
+      max_tokens: 8192,
+      system: SUMMARY_SYSTEM_PROMPT,
+      messages: [{ role: "user", content: userContent }],
+    });
+    const block = message.content[0];
+    const summary = block.type === "text" ? block.text : "";
 
     res.json({ summary });
   } catch (err) {
