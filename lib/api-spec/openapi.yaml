@@ -14,6 +14,8 @@ tags:
     description: Newsletter dashboard operations
   - name: channels
     description: Tracked YouTube channel management
+  - name: transcriber
+    description: On-demand podcast transcription and summarisation
 paths:
   /healthz:
     get:
@@ -235,6 +237,108 @@ paths:
                 $ref: "#/components/schemas/TrackedChannel"
         "404":
           description: Channel not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /transcriber/transcript:
+    post:
+      operationId: transcribeVideo
+      tags: [transcriber]
+      summary: Fetch transcript for a YouTube video
+      description: Fetches the caption track and video metadata (title, thumbnail) from YouTube
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TranscribeVideoBody"
+      responses:
+        "200":
+          description: Transcript and video metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranscriptResult"
+        "400":
+          description: Invalid YouTube URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: No caption track found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Unable to reach YouTube
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /transcriber/summary:
+    post:
+      operationId: summariseTranscript
+      tags: [transcriber]
+      summary: Generate AI summary from a transcript
+      description: Sends the transcript to Claude and returns a 4-6 paragraph summary
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SummariseTranscriptBody"
+      responses:
+        "200":
+          description: AI-generated summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SummaryResult"
+        "400":
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: AI service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /transcriber/notion:
+    post:
+      operationId: pushToNotion
+      tags: [transcriber]
+      summary: Push transcript and summary to Notion
+      description: Creates a new page in the configured Notion podcast database
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushToNotionBody"
+      responses:
+        "200":
+          description: Notion page created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotionResult"
+        "400":
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Notion API unavailable
           content:
             application/json:
               schema:
