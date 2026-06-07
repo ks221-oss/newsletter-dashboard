@@ -239,6 +239,11 @@ router.post("/transcriber/notion", async (req, res): Promise<void> => {
 
   const today = new Date().toISOString().slice(0, 10);
 
+  // Notion API max 100 children per create request — batch the rest via append
+  const BATCH_SIZE = 90; // leave headroom for heading blocks
+  const firstTranscriptBatch = transcriptBlocks.slice(0, BATCH_SIZE);
+  const remainingTranscriptBlocks = transcriptBlocks.slice(BATCH_SIZE);
+
   const payload = {
     parent: { database_id: NOTION_DB_ID },
     cover: thumbnailUrl
@@ -271,9 +276,30 @@ router.post("/transcriber/notion", async (req, res): Promise<void> => {
           rich_text: [{ type: "text", text: { content: "Transcript" } }],
         },
       },
-      ...transcriptBlocks.slice(0, 95), // Notion API max ~100 blocks per request
+      ...firstTranscriptBatch,
     ],
   };
+
+  async function appendNotionBlocks(pageId: string, blocks: unknown[]): Promise<void> {
+    const APPEND_BATCH = 100;
+    for (let i = 0; i < blocks.length; i += APPEND_BATCH) {
+      const batch = blocks.slice(i, i + APPEND_BATCH);
+      const appendRes = await fetch(`https://api.notion.com/v1/blocks/${pageId}/children`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${notionKey}`,
+          "Content-Type": "application/json",
+          "Notion-Version": "2022-06-28",
+        },
+        body: JSON.stringify({ children: batch }),
+        signal: AbortSignal.timeout(20000),
+      });
+      if (!appendRes.ok) {
+        const errText = await appendRes.text();
+        throw new Error(`Notion append returned ${appendRes.status}: ${errText.slice(0, 200)}`);
+      }
+    }
+  }
 
   try {
     const notionRes = await fetch("https://api.notion.com/v1/pages", {
@@ -296,10 +322,16 @@ router.post("/transcriber/notion", async (req, res): Promise<void> => {
 
     const page = (await notionRes.json()) as { id: string; url: string };
     const notionPageUrl = page.url ?? `https://www.notion.so/${page.id.replace(/-/g, "")}`;
+
+    // Append remaining transcript blocks in batches (full transcript, no truncation)
+    if (remainingTranscriptBlocks.length > 0) {
+      await appendNotionBlocks(page.id, remainingTranscriptBlocks);
+    }
+
     res.json({ notionPageUrl });
   } catch (err) {
     req.log.error({ err }, "Failed to reach Notion API");
-    res.status(502).json({ error: "Could not reach Notion" });
+    res.status(502).json({ error: `Could not push to Notion: ${err instanceof Error ? err.message : String(err)}` });
   }
 });
 
