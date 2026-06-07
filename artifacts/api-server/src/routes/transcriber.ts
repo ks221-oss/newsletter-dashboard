@@ -15,6 +15,45 @@ const YT_HEADERS = {
 
 const NOTION_DB_ID = "3778d67d1a80806cbfd7d7cec90b08cb";
 
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+// ─── In-memory caches ─────────────────────────────────────────────────────────
+
+interface TranscriptCacheEntry {
+  data: { videoId: string; title: string; thumbnailUrl: string | null; lines: Array<{ offset: number; text: string }> };
+  cachedAt: number;
+}
+
+interface SummaryCacheEntry {
+  data: { summary: string };
+  cachedAt: number;
+}
+
+const transcriptCache = new Map<string, TranscriptCacheEntry>();
+const summaryCache = new Map<string, SummaryCacheEntry>();
+
+function getCachedTranscript(videoId: string): TranscriptCacheEntry["data"] | null {
+  const entry = transcriptCache.get(videoId);
+  if (!entry) return null;
+  if (Date.now() - entry.cachedAt > CACHE_TTL_MS) {
+    transcriptCache.delete(videoId);
+    return null;
+  }
+  return entry.data;
+}
+
+function getCachedSummary(videoId: string): SummaryCacheEntry["data"] | null {
+  const entry = summaryCache.get(videoId);
+  if (!entry) return null;
+  if (Date.now() - entry.cachedAt > CACHE_TTL_MS) {
+    summaryCache.delete(videoId);
+    return null;
+  }
+  return entry.data;
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
 function extractVideoId(url: string): string | null {
   try {
     const u = new URL(url);
@@ -57,6 +96,14 @@ router.post("/transcriber/transcript", async (req, res): Promise<void> => {
   const videoId = extractVideoId(body.data.youtubeUrl);
   if (!videoId) {
     res.status(400).json({ error: "Could not extract a video ID from the provided URL" });
+    return;
+  }
+
+  // Check cache first
+  const cached = getCachedTranscript(videoId);
+  if (cached) {
+    req.log.info({ videoId }, "Transcript cache hit");
+    res.json(cached);
     return;
   }
 
@@ -144,7 +191,12 @@ router.post("/transcriber/transcript", async (req, res): Promise<void> => {
     return;
   }
 
-  res.json({ videoId, title, thumbnailUrl, lines });
+  const result = { videoId, title, thumbnailUrl, lines };
+
+  // Store in cache
+  transcriptCache.set(videoId, { data: result, cachedAt: Date.now() });
+
+  res.json(result);
 });
 
 // ─── POST /transcriber/summary ────────────────────────────────────────────────
@@ -154,6 +206,17 @@ router.post("/transcriber/summary", async (req, res): Promise<void> => {
   if (!body.success) {
     res.status(400).json({ error: body.error.message });
     return;
+  }
+
+  // Check summary cache if a videoId was provided
+  const { videoId } = body.data;
+  if (videoId) {
+    const cached = getCachedSummary(videoId);
+    if (cached) {
+      req.log.info({ videoId }, "Summary cache hit");
+      res.json(cached);
+      return;
+    }
   }
 
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
@@ -180,7 +243,14 @@ router.post("/transcriber/summary", async (req, res): Promise<void> => {
     const block = message.content[0];
     const summary = block.type === "text" ? block.text : "";
 
-    res.json({ summary });
+    const result = { summary };
+
+    // Store in cache if videoId was provided
+    if (videoId) {
+      summaryCache.set(videoId, { data: result, cachedAt: Date.now() });
+    }
+
+    res.json(result);
   } catch (err) {
     req.log.error({ err }, "AI summary error");
     res.status(502).json({ error: "AI service unavailable" });

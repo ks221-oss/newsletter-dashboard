@@ -166,6 +166,9 @@ importers:
 
   artifacts/api-server:
     dependencies:
+      '@anthropic-ai/sdk':
+        specifier: ^0.101.0
+        version: 0.101.0(zod@3.25.76)
       '@clerk/express':
         specifier: ^2.1.23
         version: 2.1.23(express@5.2.1)
@@ -206,9 +209,6 @@ importers:
         specifier: ^10.5.0
         version: 10.5.0
     devDependencies:
-      '@anthropic-ai/sdk':
-        specifier: ^0.101.0
-        version: 0.101.0(zod@3.25.76)
       '@types/cookie-parser':
         specifier: ^1.4.10
         version: 1.4.10(@types/express@5.0.6)

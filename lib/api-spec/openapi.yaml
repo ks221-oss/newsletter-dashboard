@@ -610,6 +610,9 @@ components:
     SummariseTranscriptBody:
       type: object
       properties:
+        videoId:
+          type: string
+          description: YouTube video ID — used for server-side summary caching
         title:
           type: string
         lines:

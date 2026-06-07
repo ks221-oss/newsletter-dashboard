@@ -184,6 +184,7 @@ export const TranscribeVideoResponse = zod.object({
  * @summary Generate AI summary from a transcript
  */
 export const SummariseTranscriptBody = zod.object({
+  "videoId": zod.string().optional().describe('YouTube video ID — used for server-side summary caching'),
   "title": zod.string(),
   "lines": zod.array(zod.object({
   "offset": zod.number().describe('Start time in seconds'),

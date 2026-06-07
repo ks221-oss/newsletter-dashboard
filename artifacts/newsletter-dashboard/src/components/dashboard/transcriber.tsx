@@ -88,7 +88,7 @@ export default function Transcriber() {
     let summary: SummaryResult;
     try {
       summary = await summariseMutation.mutateAsync({
-        data: { title: transcript.title, lines: transcript.lines },
+        data: { videoId: transcript.videoId, title: transcript.title, lines: transcript.lines },
       });
     } catch (err: unknown) {
       setErrorMsg(getApiErrorMessage(err, "AI service unavailable"));

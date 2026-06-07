@@ -123,6 +123,8 @@ export interface TranscriptResult {
 }
 
 export interface SummariseTranscriptBody {
+  /** YouTube video ID — used for server-side summary caching */
+  videoId?: string;
   title: string;
   lines: TranscriptLine[];
 }
