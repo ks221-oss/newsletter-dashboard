@@ -7,13 +7,11 @@ const SUMMARY_SYSTEM_PROMPT =
 
 const router: IRouter = Router();
 
-const YT_HEADERS = {
-  "User-Agent":
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-  "Accept-Language": "en-US,en;q=0.9",
-};
-
 const NOTION_DB_ID = "3778d67d1a80806cbfd7d7cec90b08cb";
+
+// VPS proxy endpoint — uses youtube-transcript-api + Webshare residential proxy
+// so YouTube never sees a cloud IP. Direct fetching from Replit is blocked.
+const VPS_TRANSCRIBE_URL = "http://168.144.159.14:8080/transcribe";
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -85,6 +83,8 @@ function decodeHtml(str: string): string {
 }
 
 // ─── POST /transcriber/transcript ────────────────────────────────────────────
+// Routes through the VPS which has youtube-transcript-api + Webshare residential
+// proxy configured. Direct fetches from cloud IPs are blocked by YouTube.
 
 router.post("/transcriber/transcript", async (req, res): Promise<void> => {
   const body = TranscribeVideoBody.safeParse(req.body);
@@ -107,96 +107,36 @@ router.post("/transcriber/transcript", async (req, res): Promise<void> => {
     return;
   }
 
-  // Fetch the watch page
-  let html: string;
+  // Route through VPS — residential proxy bypasses YouTube's cloud IP block
+  let vpsData: TranscriptCacheEntry["data"];
   try {
-    const pageRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
-      headers: YT_HEADERS,
-      signal: AbortSignal.timeout(12000),
+    const vpsRes = await fetch(`${VPS_TRANSCRIBE_URL}?video_id=${encodeURIComponent(videoId)}`, {
+      signal: AbortSignal.timeout(60000), // transcription can take a moment
     });
-    if (!pageRes.ok) {
-      res.status(502).json({ error: "YouTube returned an error fetching the video page" });
+
+    if (!vpsRes.ok) {
+      let errMsg = "No captions available for this video";
+      try {
+        const errBody = (await vpsRes.json()) as { error?: string };
+        if (errBody.error) errMsg = errBody.error;
+      } catch {
+        // ignore parse error
+      }
+      res.status(vpsRes.status === 404 ? 404 : 502).json({ error: errMsg });
       return;
     }
-    html = await pageRes.text();
+
+    vpsData = (await vpsRes.json()) as TranscriptCacheEntry["data"];
   } catch (err) {
-    req.log.error({ err }, "Failed to fetch YouTube watch page");
-    res.status(502).json({ error: "Could not reach YouTube" });
+    req.log.error({ err }, "Failed to reach VPS transcription endpoint");
+    res.status(502).json({ error: "Transcription service unreachable — please try again" });
     return;
   }
-
-  // Extract title and thumbnail from og tags
-  const titleMatch = html.match(/<meta\s+(?:property="og:title"|name="title")\s+content="([^"]+)"/);
-  const thumbMatch = html.match(/<meta\s+property="og:image"\s+content="([^"]+)"/);
-  const title = titleMatch ? decodeHtml(titleMatch[1]) : `YouTube video ${videoId}`;
-  const thumbnailUrl = thumbMatch ? thumbMatch[1] : null;
-
-  // Extract captionTracks from ytInitialPlayerResponse
-  const captionMatch = html.match(/"captionTracks":(\[.*?\])/s);
-  if (!captionMatch) {
-    res.status(404).json({ error: "No captions available for this video" });
-    return;
-  }
-
-  let captionTracks: Array<{ baseUrl: string; languageCode: string; kind?: string }>;
-  try {
-    captionTracks = JSON.parse(captionMatch[1]);
-  } catch {
-    res.status(404).json({ error: "Could not parse caption data from YouTube" });
-    return;
-  }
-
-  if (captionTracks.length === 0) {
-    res.status(404).json({ error: "No captions available for this video" });
-    return;
-  }
-
-  // Prefer English non-ASR, then English ASR, then first available
-  const track =
-    captionTracks.find((t) => t.languageCode === "en" && t.kind !== "asr") ||
-    captionTracks.find((t) => t.languageCode === "en") ||
-    captionTracks[0];
-
-  // Fetch timed-text XML
-  let xml: string;
-  try {
-    const timedRes = await fetch(track.baseUrl, {
-      headers: YT_HEADERS,
-      signal: AbortSignal.timeout(12000),
-    });
-    if (!timedRes.ok) {
-      res.status(502).json({ error: "Failed to fetch caption data from YouTube" });
-      return;
-    }
-    xml = await timedRes.text();
-  } catch (err) {
-    req.log.error({ err }, "Failed to fetch timed-text XML");
-    res.status(502).json({ error: "Could not reach YouTube captions" });
-    return;
-  }
-
-  // Parse <text start="…" dur="…">…</text>
-  const lines: Array<{ offset: number; text: string }> = [];
-  const textRe = /<text[^>]+start="([\d.]+)"[^>]*>([^<]*)<\/text>/g;
-  let m: RegExpExecArray | null;
-  while ((m = textRe.exec(xml)) !== null) {
-    const text = decodeHtml(m[2].trim());
-    if (text) {
-      lines.push({ offset: parseFloat(m[1]), text });
-    }
-  }
-
-  if (lines.length === 0) {
-    res.status(404).json({ error: "Caption track was empty" });
-    return;
-  }
-
-  const result = { videoId, title, thumbnailUrl, lines };
 
   // Store in cache
-  transcriptCache.set(videoId, { data: result, cachedAt: Date.now() });
+  transcriptCache.set(videoId, { data: vpsData, cachedAt: Date.now() });
 
-  res.json(result);
+  res.json(vpsData);
 });
 
 // ─── POST /transcriber/summary ────────────────────────────────────────────────
@@ -208,7 +148,6 @@ router.post("/transcriber/summary", async (req, res): Promise<void> => {
     return;
   }
 
-  // Check summary cache if a videoId was provided
   const { videoId } = body.data;
   if (videoId) {
     const cached = getCachedSummary(videoId);
@@ -220,7 +159,6 @@ router.post("/transcriber/summary", async (req, res): Promise<void> => {
   }
 
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
-
   if (!anthropicKey) {
     res.status(502).json({ error: "AI service not configured — set ANTHROPIC_API_KEY" });
     return;
@@ -244,8 +182,6 @@ router.post("/transcriber/summary", async (req, res): Promise<void> => {
     const summary = block.type === "text" ? block.text : "";
 
     const result = { summary };
-
-    // Store in cache if videoId was provided
     if (videoId) {
       summaryCache.set(videoId, { data: result, cachedAt: Date.now() });
     }
@@ -274,7 +210,6 @@ router.post("/transcriber/notion", async (req, res): Promise<void> => {
 
   const { title, youtubeUrl, thumbnailUrl, summary, lines } = body.data;
 
-  // Build summary paragraph blocks (split on double newlines)
   const summaryParas = summary
     .split(/\n\n+/)
     .map((p) => p.trim())
@@ -288,7 +223,6 @@ router.post("/transcriber/notion", async (req, res): Promise<void> => {
     },
   }));
 
-  // Build transcript block — single code block (Notion max 2000 chars per block, chunk it)
   const transcriptText = lines
     .map((l) => `[${formatOffset(l.offset)}] ${l.text}`)
     .join("\n");
@@ -307,13 +241,10 @@ router.post("/transcriber/notion", async (req, res): Promise<void> => {
   }
 
   const today = new Date().toISOString().slice(0, 10);
-
-  // Notion API max 100 children per create request — batch the rest via append
-  const BATCH_SIZE = 90; // leave headroom for heading blocks
+  const BATCH_SIZE = 90;
   const firstTranscriptBatch = transcriptBlocks.slice(0, BATCH_SIZE);
   const remainingTranscriptBlocks = transcriptBlocks.slice(BATCH_SIZE);
 
-  // Fetch DB schema to build only properties that exist, using the actual property names
   let dbProperties: Record<string, { type: string }> = {};
   try {
     const dbRes = await fetch(`https://api.notion.com/v1/databases/${NOTION_DB_ID}`, {
@@ -328,10 +259,9 @@ router.post("/transcriber/notion", async (req, res): Promise<void> => {
       dbProperties = dbData.properties ?? {};
     }
   } catch {
-    // Best-effort — continue with empty dbProperties (only title will be set)
+    // Best-effort
   }
 
-  // Build properties defensively — only include keys that exist in the DB
   type NotionPropertyValue =
     | { title: Array<{ type: string; text: { content: string } }> }
     | { url: string }
@@ -339,7 +269,6 @@ router.post("/transcriber/notion", async (req, res): Promise<void> => {
 
   const properties: Record<string, NotionPropertyValue> = {};
 
-  // Find the title property (always required, but may have any name)
   const titlePropName = Object.keys(dbProperties).find(
     (k) => dbProperties[k].type === "title",
   ) ?? "Name";
@@ -347,7 +276,6 @@ router.post("/transcriber/notion", async (req, res): Promise<void> => {
     title: [{ type: "text", text: { content: title } }],
   };
 
-  // URL property — only if present and is a url type
   const urlPropName = Object.keys(dbProperties).find(
     (k) => dbProperties[k].type === "url" || k.toLowerCase() === "url",
   );
@@ -355,7 +283,6 @@ router.post("/transcriber/notion", async (req, res): Promise<void> => {
     properties[urlPropName] = { url: youtubeUrl };
   }
 
-  // Date property — only if present and is a date type
   const datePropName = Object.keys(dbProperties).find(
     (k) => dbProperties[k].type === "date" || k.toLowerCase() === "date",
   );
@@ -373,17 +300,13 @@ router.post("/transcriber/notion", async (req, res): Promise<void> => {
       {
         object: "block",
         type: "heading_2",
-        heading_2: {
-          rich_text: [{ type: "text", text: { content: "Summary" } }],
-        },
+        heading_2: { rich_text: [{ type: "text", text: { content: "Summary" } }] },
       },
       ...summaryBlocks,
       {
         object: "block",
         type: "heading_2",
-        heading_2: {
-          rich_text: [{ type: "text", text: { content: "Transcript" } }],
-        },
+        heading_2: { rich_text: [{ type: "text", text: { content: "Transcript" } }] },
       },
       ...firstTranscriptBatch,
     ],
@@ -432,7 +355,6 @@ router.post("/transcriber/notion", async (req, res): Promise<void> => {
     const page = (await notionRes.json()) as { id: string; url: string };
     const notionPageUrl = page.url ?? `https://www.notion.so/${page.id.replace(/-/g, "")}`;
 
-    // Append remaining transcript blocks in batches (full transcript, no truncation)
     if (remainingTranscriptBlocks.length > 0) {
       await appendNotionBlocks(page.id, remainingTranscriptBlocks);
     }
