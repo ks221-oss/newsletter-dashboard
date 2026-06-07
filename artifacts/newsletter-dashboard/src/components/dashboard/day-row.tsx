@@ -24,6 +24,8 @@ function getErrorType(error: string) {
   if (lower.includes("invalid video id")) return { label: "SHORTS_PARSE", color: "text-amber-400 border-amber-400/40" };
   if (lower.includes("disabled")) return { label: "CREATOR_DISABLED", color: "text-red-400 border-red-400/40" };
   if (lower.includes("could not retrieve")) return { label: "NO_CAPTIONS", color: "text-orange-400 border-orange-400/40" };
+  if (lower.includes("proxy") || lower.includes("502") || lower.includes("connectionpool") || lower.includes("max retries")) return { label: "PROXY_ERR", color: "text-blue-400 border-blue-400/40" };
+  if (lower.includes("timeout") || lower.includes("timed out")) return { label: "TIMEOUT", color: "text-blue-400 border-blue-400/40" };
   return { label: "UNKNOWN", color: "text-muted-foreground border-border" };
 }
 
@@ -81,9 +83,18 @@ function SingleRunDetail({ run, idx }: { run: RunRecord; idx: number }) {
                       {v.channel}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className={`font-mono text-[10px] rounded-none bg-transparent ${err.color}`}>
+                      <Badge
+                        variant="outline"
+                        title={v.transcript_error ?? ""}
+                        className={`font-mono text-[10px] rounded-none bg-transparent ${err.color} cursor-help`}
+                      >
                         {err.label}
                       </Badge>
+                      {err.label === "UNKNOWN" && v.transcript_error && (
+                        <p className="font-mono text-[9px] text-muted-foreground/60 mt-0.5 max-w-[260px] break-words leading-relaxed">
+                          {v.transcript_error}
+                        </p>
+                      )}
                     </TableCell>
                   </TableRow>
                 );
