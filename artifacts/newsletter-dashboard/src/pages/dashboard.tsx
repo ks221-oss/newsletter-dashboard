@@ -5,6 +5,7 @@ import Timeline from "@/components/dashboard/timeline";
 import NavRail, { NavView } from "@/components/dashboard/nav-rail";
 import ChannelGrid from "@/components/dashboard/channel-grid";
 import SidePaneLogs from "@/components/dashboard/side-pane-logs";
+import Transcriber from "@/components/dashboard/transcriber";
 import { AlertCircle, RefreshCw, Youtube, List } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -73,6 +74,8 @@ export default function Dashboard() {
         {/* Desktop view content */}
         <div className="hidden md:block flex-1 p-6 overflow-auto">
           {activeView === "accounts" && <ChannelGrid />}
+
+          {activeView === "transcriber" && <Transcriber />}
 
           {activeView === "logs" && (
             <div className="space-y-8">

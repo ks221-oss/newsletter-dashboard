@@ -1,10 +1,10 @@
 import React from "react";
-import { Youtube, List, BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
+import { Youtube, List, BookOpen, Mic, ChevronLeft, ChevronRight } from "lucide-react";
 
 const NOTION_URL =
   "https://app.notion.com/p/ks221/3778d67d1a808030834fd3d08f41b05e?v=3778d67d1a80800eb016000c4288ba59";
 
-export type NavView = "accounts" | "logs";
+export type NavView = "accounts" | "logs" | "transcriber";
 
 interface NavRailProps {
   activeView: NavView;
@@ -66,6 +66,18 @@ export default function NavRail({
           <List className="w-3.5 h-3.5" />
         </button>
 
+        <button
+          onClick={() => activate("transcriber")}
+          className={`flex items-center justify-center h-10 w-full border-b border-border/60 transition-colors ${
+            activeView === "transcriber"
+              ? "text-primary bg-primary/10 border-l-2 border-l-primary"
+              : "text-muted-foreground hover:text-primary hover:bg-primary/5 border-l-2 border-l-transparent"
+          }`}
+          title="Podcast Transcriber"
+        >
+          <Mic className="w-3.5 h-3.5" />
+        </button>
+
         <a
           href={NOTION_URL}
           target="_blank"
@@ -108,6 +120,7 @@ export default function NavRail({
           [
             { view: "accounts" as NavView, Icon: Youtube, label: "Accounts Tracked", count: channelCount },
             { view: "logs" as NavView, Icon: List, label: "Logs", count: logCount },
+            { view: "transcriber" as NavView, Icon: Mic, label: "Transcriber", count: 0 },
           ] as const
         ).map(({ view, Icon, label, count }) => (
           <button

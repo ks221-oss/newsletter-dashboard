@@ -161,6 +161,63 @@ export const DeleteChannelResponse = zod.object({
 
 
 /**
+ * Fetches the caption track and video metadata (title, thumbnail) from YouTube
+ * @summary Fetch transcript for a YouTube video
+ */
+export const TranscribeVideoBody = zod.object({
+  "youtubeUrl": zod.string().describe('YouTube video URL (youtube.com\/watch?v= or youtu.be\/)')
+})
+
+export const TranscribeVideoResponse = zod.object({
+  "videoId": zod.string(),
+  "title": zod.string(),
+  "thumbnailUrl": zod.string().nullable(),
+  "lines": zod.array(zod.object({
+  "offset": zod.number().describe('Start time in seconds'),
+  "text": zod.string()
+}))
+})
+
+
+/**
+ * Sends the transcript to Claude and returns a 4-6 paragraph summary
+ * @summary Generate AI summary from a transcript
+ */
+export const SummariseTranscriptBody = zod.object({
+  "title": zod.string(),
+  "lines": zod.array(zod.object({
+  "offset": zod.number().describe('Start time in seconds'),
+  "text": zod.string()
+}))
+})
+
+export const SummariseTranscriptResponse = zod.object({
+  "summary": zod.string()
+})
+
+
+/**
+ * Creates a new page in the configured Notion podcast database
+ * @summary Push transcript and summary to Notion
+ */
+export const PushToNotionBody = zod.object({
+  "videoId": zod.string(),
+  "title": zod.string(),
+  "youtubeUrl": zod.string(),
+  "thumbnailUrl": zod.string().nullable(),
+  "summary": zod.string(),
+  "lines": zod.array(zod.object({
+  "offset": zod.number().describe('Start time in seconds'),
+  "text": zod.string()
+}))
+})
+
+export const PushToNotionResponse = zod.object({
+  "notionPageUrl": zod.string()
+})
+
+
+/**
  * Returns high-level stats about newsletter runs
  * @summary Get dashboard summary stats
  */

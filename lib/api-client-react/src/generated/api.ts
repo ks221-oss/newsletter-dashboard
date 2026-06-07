@@ -27,8 +27,14 @@ import type {
   GetChannelsJson200,
   GmailStatus,
   HealthStatus,
+  NotionResult,
+  PushToNotionBody,
   RunsData,
+  SummariseTranscriptBody,
+  SummaryResult,
   TrackedChannel,
+  TranscribeVideoBody,
+  TranscriptResult,
   UpdateChannelBody,
   ValidateChannelParams
 } from './api.schemas';
@@ -734,6 +740,222 @@ export const useDeleteChannel = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getDeleteChannelMutationOptions(options));
+    }
+
+export const getTranscribeVideoUrl = () => {
+
+
+
+
+  return `/api/transcriber/transcript`
+}
+
+/**
+ * Fetches the caption track and video metadata (title, thumbnail) from YouTube
+ * @summary Fetch transcript for a YouTube video
+ */
+export const transcribeVideo = async (transcribeVideoBody: TranscribeVideoBody, options?: RequestInit): Promise<TranscriptResult> => {
+
+  return customFetch<TranscriptResult>(getTranscribeVideoUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      transcribeVideoBody,)
+  }
+);}
+
+
+
+
+export const getTranscribeVideoMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transcribeVideo>>, TError,{data: BodyType<TranscribeVideoBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof transcribeVideo>>, TError,{data: BodyType<TranscribeVideoBody>}, TContext> => {
+
+const mutationKey = ['transcribeVideo'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof transcribeVideo>>, {data: BodyType<TranscribeVideoBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  transcribeVideo(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TranscribeVideoMutationResult = NonNullable<Awaited<ReturnType<typeof transcribeVideo>>>
+    export type TranscribeVideoMutationBody = BodyType<TranscribeVideoBody>
+    export type TranscribeVideoMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Fetch transcript for a YouTube video
+ */
+export const useTranscribeVideo = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transcribeVideo>>, TError,{data: BodyType<TranscribeVideoBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof transcribeVideo>>,
+        TError,
+        {data: BodyType<TranscribeVideoBody>},
+        TContext
+      > => {
+      return useMutation(getTranscribeVideoMutationOptions(options));
+    }
+
+export const getSummariseTranscriptUrl = () => {
+
+
+
+
+  return `/api/transcriber/summary`
+}
+
+/**
+ * Sends the transcript to Claude and returns a 4-6 paragraph summary
+ * @summary Generate AI summary from a transcript
+ */
+export const summariseTranscript = async (summariseTranscriptBody: SummariseTranscriptBody, options?: RequestInit): Promise<SummaryResult> => {
+
+  return customFetch<SummaryResult>(getSummariseTranscriptUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      summariseTranscriptBody,)
+  }
+);}
+
+
+
+
+export const getSummariseTranscriptMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof summariseTranscript>>, TError,{data: BodyType<SummariseTranscriptBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof summariseTranscript>>, TError,{data: BodyType<SummariseTranscriptBody>}, TContext> => {
+
+const mutationKey = ['summariseTranscript'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof summariseTranscript>>, {data: BodyType<SummariseTranscriptBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  summariseTranscript(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SummariseTranscriptMutationResult = NonNullable<Awaited<ReturnType<typeof summariseTranscript>>>
+    export type SummariseTranscriptMutationBody = BodyType<SummariseTranscriptBody>
+    export type SummariseTranscriptMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Generate AI summary from a transcript
+ */
+export const useSummariseTranscript = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof summariseTranscript>>, TError,{data: BodyType<SummariseTranscriptBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof summariseTranscript>>,
+        TError,
+        {data: BodyType<SummariseTranscriptBody>},
+        TContext
+      > => {
+      return useMutation(getSummariseTranscriptMutationOptions(options));
+    }
+
+export const getPushToNotionUrl = () => {
+
+
+
+
+  return `/api/transcriber/notion`
+}
+
+/**
+ * Creates a new page in the configured Notion podcast database
+ * @summary Push transcript and summary to Notion
+ */
+export const pushToNotion = async (pushToNotionBody: PushToNotionBody, options?: RequestInit): Promise<NotionResult> => {
+
+  return customFetch<NotionResult>(getPushToNotionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      pushToNotionBody,)
+  }
+);}
+
+
+
+
+export const getPushToNotionMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof pushToNotion>>, TError,{data: BodyType<PushToNotionBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof pushToNotion>>, TError,{data: BodyType<PushToNotionBody>}, TContext> => {
+
+const mutationKey = ['pushToNotion'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof pushToNotion>>, {data: BodyType<PushToNotionBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  pushToNotion(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PushToNotionMutationResult = NonNullable<Awaited<ReturnType<typeof pushToNotion>>>
+    export type PushToNotionMutationBody = BodyType<PushToNotionBody>
+    export type PushToNotionMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Push transcript and summary to Notion
+ */
+export const usePushToNotion = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof pushToNotion>>, TError,{data: BodyType<PushToNotionBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof pushToNotion>>,
+        TError,
+        {data: BodyType<PushToNotionBody>},
+        TContext
+      > => {
+      return useMutation(getPushToNotionMutationOptions(options));
     }
 
 export const getGetDashboardSummaryUrl = () => {

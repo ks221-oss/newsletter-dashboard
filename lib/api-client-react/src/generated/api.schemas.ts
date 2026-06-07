@@ -104,6 +104,46 @@ export interface ChannelValidation {
   videos: ChannelVideo[];
 }
 
+export interface TranscriptLine {
+  /** Start time in seconds */
+  offset: number;
+  text: string;
+}
+
+export interface TranscribeVideoBody {
+  /** YouTube video URL (youtube.com/watch?v= or youtu.be/) */
+  youtubeUrl: string;
+}
+
+export interface TranscriptResult {
+  videoId: string;
+  title: string;
+  thumbnailUrl: string | null;
+  lines: TranscriptLine[];
+}
+
+export interface SummariseTranscriptBody {
+  title: string;
+  lines: TranscriptLine[];
+}
+
+export interface SummaryResult {
+  summary: string;
+}
+
+export interface PushToNotionBody {
+  videoId: string;
+  title: string;
+  youtubeUrl: string;
+  thumbnailUrl: string | null;
+  summary: string;
+  lines: TranscriptLine[];
+}
+
+export interface NotionResult {
+  notionPageUrl: string;
+}
+
 export interface DashboardSummary {
   totalRuns: number;
   last30DaysRuns: number;

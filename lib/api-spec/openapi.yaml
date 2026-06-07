@@ -566,6 +566,102 @@ components:
         - lookbackDays
         - videos
 
+    TranscriptLine:
+      type: object
+      properties:
+        offset:
+          type: number
+          description: Start time in seconds
+        text:
+          type: string
+      required:
+        - offset
+        - text
+
+    TranscribeVideoBody:
+      type: object
+      properties:
+        youtubeUrl:
+          type: string
+          description: YouTube video URL (youtube.com/watch?v= or youtu.be/)
+      required:
+        - youtubeUrl
+
+    TranscriptResult:
+      type: object
+      properties:
+        videoId:
+          type: string
+        title:
+          type: string
+        thumbnailUrl:
+          type: string
+          nullable: true
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/TranscriptLine"
+      required:
+        - videoId
+        - title
+        - thumbnailUrl
+        - lines
+
+    SummariseTranscriptBody:
+      type: object
+      properties:
+        title:
+          type: string
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/TranscriptLine"
+      required:
+        - title
+        - lines
+
+    SummaryResult:
+      type: object
+      properties:
+        summary:
+          type: string
+      required:
+        - summary
+
+    PushToNotionBody:
+      type: object
+      properties:
+        videoId:
+          type: string
+        title:
+          type: string
+        youtubeUrl:
+          type: string
+        thumbnailUrl:
+          type: string
+          nullable: true
+        summary:
+          type: string
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/TranscriptLine"
+      required:
+        - videoId
+        - title
+        - youtubeUrl
+        - thumbnailUrl
+        - summary
+        - lines
+
+    NotionResult:
+      type: object
+      properties:
+        notionPageUrl:
+          type: string
+      required:
+        - notionPageUrl
+
     DashboardSummary:
       type: object
       properties:
