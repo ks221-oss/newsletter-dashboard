@@ -2,6 +2,9 @@ import { Router, type IRouter } from "express";
 import Anthropic from "@anthropic-ai/sdk";
 import { TranscribeVideoBody, SummariseTranscriptBody, PushToNotionBody } from "@workspace/api-zod";
 
+const SUMMARY_SYSTEM_PROMPT =
+  "You are a research assistant. Summarise this podcast transcript in 4–6 concise paragraphs covering the main topics, key insights, and any notable quotes. Be factual and avoid filler.";
+
 const router: IRouter = Router();
 
 const YT_HEADERS = {
@@ -153,9 +156,12 @@ router.post("/transcriber/summary", async (req, res): Promise<void> => {
     return;
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    res.status(502).json({ error: "AI service not configured (missing ANTHROPIC_API_KEY)" });
+  const openaiKey = process.env.OPENAI_API_KEY;
+  const openaiBaseUrl = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+
+  if (!openaiKey && !anthropicKey) {
+    res.status(502).json({ error: "AI service not configured — set OPENAI_API_KEY or ANTHROPIC_API_KEY" });
     return;
   }
 
@@ -163,27 +169,54 @@ router.post("/transcriber/summary", async (req, res): Promise<void> => {
     .map((l) => `[${formatOffset(l.offset)}] ${l.text}`)
     .join("\n");
 
-  const client = new Anthropic({ apiKey });
+  const userContent = `Title: ${body.data.title}\n\nTranscript:\n${plainText}`;
 
   try {
-    const message = await client.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 8192,
-      system:
-        "You are a research assistant. Summarise this podcast transcript in 4–6 concise paragraphs covering the main topics, key insights, and any notable quotes. Be factual and avoid filler.",
-      messages: [
-        {
-          role: "user",
-          content: `Title: ${body.data.title}\n\nTranscript:\n${plainText}`,
-        },
-      ],
-    });
+    let summary = "";
 
-    const block = message.content[0];
-    const summary = block.type === "text" ? block.text : "";
+    if (openaiKey) {
+      // Primary: OpenAI gpt-4o-mini (via Replit proxy if available, else direct)
+      const baseURL = openaiBaseUrl ?? "https://api.openai.com/v1";
+      const chatRes = await fetch(`${baseURL}/chat/completions`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${openaiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          max_tokens: 8192,
+          messages: [
+            { role: "system", content: SUMMARY_SYSTEM_PROMPT },
+            { role: "user", content: userContent },
+          ],
+        }),
+        signal: AbortSignal.timeout(60000),
+      });
+      if (!chatRes.ok) {
+        const err = await chatRes.text();
+        throw new Error(`OpenAI returned ${chatRes.status}: ${err.slice(0, 200)}`);
+      }
+      const data = (await chatRes.json()) as {
+        choices: Array<{ message: { content: string } }>;
+      };
+      summary = data.choices[0]?.message?.content ?? "";
+    } else {
+      // Fallback: Anthropic Claude (user-provided key)
+      const client = new Anthropic({ apiKey: anthropicKey! });
+      const message = await client.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 8192,
+        system: SUMMARY_SYSTEM_PROMPT,
+        messages: [{ role: "user", content: userContent }],
+      });
+      const block = message.content[0];
+      summary = block.type === "text" ? block.text : "";
+    }
+
     res.json({ summary });
   } catch (err) {
-    req.log.error({ err }, "Anthropic API error");
+    req.log.error({ err }, "AI summary error");
     res.status(502).json({ error: "AI service unavailable" });
   }
 });
@@ -244,22 +277,62 @@ router.post("/transcriber/notion", async (req, res): Promise<void> => {
   const firstTranscriptBatch = transcriptBlocks.slice(0, BATCH_SIZE);
   const remainingTranscriptBlocks = transcriptBlocks.slice(BATCH_SIZE);
 
+  // Fetch DB schema to build only properties that exist, using the actual property names
+  let dbProperties: Record<string, { type: string }> = {};
+  try {
+    const dbRes = await fetch(`https://api.notion.com/v1/databases/${NOTION_DB_ID}`, {
+      headers: {
+        Authorization: `Bearer ${notionKey}`,
+        "Notion-Version": "2022-06-28",
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (dbRes.ok) {
+      const dbData = (await dbRes.json()) as { properties: Record<string, { type: string }> };
+      dbProperties = dbData.properties ?? {};
+    }
+  } catch {
+    // Best-effort — continue with empty dbProperties (only title will be set)
+  }
+
+  // Build properties defensively — only include keys that exist in the DB
+  type NotionPropertyValue =
+    | { title: Array<{ type: string; text: { content: string } }> }
+    | { url: string }
+    | { date: { start: string } };
+
+  const properties: Record<string, NotionPropertyValue> = {};
+
+  // Find the title property (always required, but may have any name)
+  const titlePropName = Object.keys(dbProperties).find(
+    (k) => dbProperties[k].type === "title",
+  ) ?? "Name";
+  properties[titlePropName] = {
+    title: [{ type: "text", text: { content: title } }],
+  };
+
+  // URL property — only if present and is a url type
+  const urlPropName = Object.keys(dbProperties).find(
+    (k) => dbProperties[k].type === "url" || k.toLowerCase() === "url",
+  );
+  if (urlPropName && dbProperties[urlPropName]?.type === "url") {
+    properties[urlPropName] = { url: youtubeUrl };
+  }
+
+  // Date property — only if present and is a date type
+  const datePropName = Object.keys(dbProperties).find(
+    (k) => dbProperties[k].type === "date" || k.toLowerCase() === "date",
+  );
+  if (datePropName && dbProperties[datePropName]?.type === "date") {
+    properties[datePropName] = { date: { start: today } };
+  }
+
   const payload = {
     parent: { database_id: NOTION_DB_ID },
     cover: thumbnailUrl
       ? { type: "external", external: { url: thumbnailUrl } }
       : undefined,
-    properties: {
-      Name: {
-        title: [{ type: "text", text: { content: title } }],
-      },
-      URL: {
-        url: youtubeUrl,
-      },
-      Date: {
-        date: { start: today },
-      },
-    },
+    properties,
     children: [
       {
         object: "block",
