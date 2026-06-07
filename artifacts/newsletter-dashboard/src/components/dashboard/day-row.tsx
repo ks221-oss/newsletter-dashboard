@@ -19,13 +19,39 @@ function formatDate(dateStr: string) {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).toUpperCase();
 }
 
-function getErrorType(error: string) {
+interface ErrorType {
+  label: string;
+  color: string;
+  description?: string;
+}
+
+function getErrorType(error: string): ErrorType {
   const lower = error.toLowerCase();
-  if (lower.includes("invalid video id")) return { label: "SHORTS_PARSE", color: "text-amber-400 border-amber-400/40" };
-  if (lower.includes("disabled")) return { label: "CREATOR_DISABLED", color: "text-red-400 border-red-400/40" };
-  if (lower.includes("could not retrieve")) return { label: "NO_CAPTIONS", color: "text-orange-400 border-orange-400/40" };
-  if (lower.includes("proxy") || lower.includes("502") || lower.includes("connectionpool") || lower.includes("max retries")) return { label: "PROXY_ERR", color: "text-blue-400 border-blue-400/40" };
-  if (lower.includes("timeout") || lower.includes("timed out")) return { label: "TIMEOUT", color: "text-blue-400 border-blue-400/40" };
+  if (lower.includes("invalid video id")) return {
+    label: "SHORTS_PARSE",
+    color: "text-amber-400 border-amber-400/40",
+    description: "YouTube Shorts don't have transcripts — the scraper can't parse their video IDs. No action needed; Shorts are expected to fail.",
+  };
+  if (lower.includes("disabled")) return {
+    label: "CREATOR_DISABLED",
+    color: "text-red-400 border-red-400/40",
+    description: "Creator disabled transcripts/captions on this video. Nothing you can do — this is a permanent creator-side setting.",
+  };
+  if (lower.includes("could not retrieve")) return {
+    label: "NO_CAPTIONS",
+    color: "text-orange-400 border-orange-400/40",
+    description: "YouTube has no auto-generated or manual captions for this video yet. It may appear later — re-running the scraper after a few hours can pick it up.",
+  };
+  if (lower.includes("proxy") || lower.includes("502") || lower.includes("connectionpool") || lower.includes("max retries")) return {
+    label: "PROXY_ERR",
+    color: "text-blue-400 border-blue-400/40",
+    description: "VPS proxy returned 502 — the proxy was temporarily down when fetching this transcript. Now: re-run the scraper manually for this URL. Long-term: add retry logic (e.g. 3× with backoff) in the scraper so transient proxy blips don't drop videos.",
+  };
+  if (lower.includes("timeout") || lower.includes("timed out")) return {
+    label: "TIMEOUT",
+    color: "text-blue-400 border-blue-400/40",
+    description: "YouTube request timed out on the VPS. Now: re-run the scraper manually for this URL. Long-term: raise the timeout setting in the scraper config and add a retry so one slow response doesn't drop the video.",
+  };
   return { label: "UNKNOWN", color: "text-muted-foreground border-border" };
 }
 
@@ -82,7 +108,7 @@ function SingleRunDetail({ run, idx }: { run: RunRecord; idx: number }) {
                     <TableCell className="text-[11px] text-muted-foreground truncate max-w-[120px]" title={v.channel}>
                       {v.channel}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="max-w-[320px]">
                       <Badge
                         variant="outline"
                         title={v.transcript_error ?? ""}
@@ -90,8 +116,13 @@ function SingleRunDetail({ run, idx }: { run: RunRecord; idx: number }) {
                       >
                         {err.label}
                       </Badge>
-                      {err.label === "UNKNOWN" && v.transcript_error && (
-                        <p className="font-mono text-[9px] text-muted-foreground/60 mt-0.5 max-w-[260px] break-words leading-relaxed">
+                      {err.description && (
+                        <p className="font-mono text-[9px] text-muted-foreground/60 mt-1 leading-relaxed break-words whitespace-normal">
+                          {err.description}
+                        </p>
+                      )}
+                      {!err.description && v.transcript_error && (
+                        <p className="font-mono text-[9px] text-muted-foreground/50 mt-1 leading-relaxed break-words whitespace-normal">
                           {v.transcript_error}
                         </p>
                       )}
