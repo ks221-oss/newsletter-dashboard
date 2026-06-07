@@ -3,9 +3,20 @@ import {
   useTranscribeVideo,
   useSummariseTranscript,
   usePushToNotion,
+  ApiError,
 } from "@workspace/api-client-react";
 import type { TranscriptResult, SummaryResult } from "@workspace/api-client-react";
 import { Mic, Loader2, ChevronDown, ChevronUp, ExternalLink, RotateCcw, Check } from "lucide-react";
+
+function getApiErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof ApiError) {
+    const apiErr = err as ApiError<{ error?: string }>;
+    if (apiErr.data?.error) return apiErr.data.error;
+    if (apiErr.message) return apiErr.message;
+  }
+  if (err instanceof Error) return err.message;
+  return fallback;
+}
 
 const NOTION_DB_URL = "https://www.notion.so/3778d67d1a80806cbfd7d7cec90b08cb";
 
@@ -67,10 +78,7 @@ export default function Transcriber() {
     try {
       transcript = await transcribeMutation.mutateAsync({ data: { youtubeUrl: trimmedUrl } });
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
-        "Failed to fetch transcript";
-      setErrorMsg(msg);
+      setErrorMsg(getApiErrorMessage(err, "Failed to fetch transcript"));
       setStage("error");
       return;
     }
@@ -83,10 +91,7 @@ export default function Transcriber() {
         data: { title: transcript.title, lines: transcript.lines },
       });
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
-        "AI service unavailable";
-      setErrorMsg(msg);
+      setErrorMsg(getApiErrorMessage(err, "AI service unavailable"));
       setStage("error");
       return;
     }
@@ -113,10 +118,7 @@ export default function Transcriber() {
       setNotionPageUrl(result.notionPageUrl);
       setNotionStatus("done");
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
-        "Failed to push to Notion";
-      setNotionError(msg);
+      setNotionError(getApiErrorMessage(err, "Failed to push to Notion"));
       setNotionStatus("error");
     }
   }
