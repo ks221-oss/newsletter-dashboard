@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import Anthropic from "@anthropic-ai/sdk";
+import { chatCompletion, getOpenRouterKey } from "../lib/openrouter";
 import { TranscribeVideoBody, SummariseTranscriptBody, PushToNotionBody } from "@workspace/api-zod";
 
 const SUMMARY_SYSTEM_PROMPT =
@@ -139,28 +139,26 @@ router.post("/transcriber/summary", async (req, res): Promise<void> => {
     if (cached) { req.log.info({ videoId }, "Summary cache hit"); res.json(cached); return; }
   }
 
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  if (!anthropicKey) { res.status(502).json({ error: "AI service not configured — set ANTHROPIC_API_KEY" }); return; }
+  const apiKey = getOpenRouterKey();
+  if (!apiKey) { res.status(502).json({ error: "AI service not configured — set OPENROUTER_API_KEY" }); return; }
 
   const plainText = body.data.lines.map((l) => `[${formatOffset(l.offset)}] ${l.text}`).join("\n");
   const userContent = `Title: ${body.data.title}\n\nTranscript:\n${plainText}`;
 
   try {
-    const client = new Anthropic({ apiKey: anthropicKey });
-    const message = await client.messages.create({
-      model: "claude-sonnet-4-5",
-      max_tokens: 8192,
+    const summary = await chatCompletion({
+      apiKey,
       system: SUMMARY_SYSTEM_PROMPT,
-      messages: [{ role: "user", content: userContent }],
+      user: userContent,
+      maxTokens: 8192,
     });
-    const block = message.content[0];
-    const summary = block.type === "text" ? block.text : "";
+    if (!summary.trim()) throw new Error("OpenRouter returned an empty summary");
     const result = { summary };
     if (videoId) summaryCache.set(videoId, { data: result, cachedAt: Date.now() });
     res.json(result);
   } catch (err) {
     req.log.error({ err }, "AI summary error");
-    res.status(502).json({ error: "AI service unavailable" });
+    res.status(502).json({ error: `AI service unavailable: ${err instanceof Error ? err.message : String(err)}` });
   }
 });
 
@@ -173,26 +171,22 @@ router.post("/transcriber/notion", async (req, res): Promise<void> => {
   const notionKey = process.env.NOTION_API_KEY;
   if (!notionKey) { res.status(502).json({ error: "Notion not configured (missing NOTION_API_KEY)" }); return; }
 
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = getOpenRouterKey();
   const { title, youtubeUrl, thumbnailUrl, summary, lines } = body.data;
   const videoId = body.data.videoId ?? extractVideoId(youtubeUrl) ?? "";
 
-  // ── Step 1: Extract structured metadata via Claude (mirrors daily pipeline) ──
+  // ── Step 1: Extract structured metadata via Claude on OpenRouter (mirrors daily pipeline) ──
   let meta: StructuredMeta = { key_topics: [], guests: [], data_points: [], depth_score: 5 };
-  if (anthropicKey) {
+  if (apiKey) {
     try {
-      const client = new Anthropic({ apiKey: anthropicKey });
       // Use first ~400 lines to stay within token budget
       const plainText = lines.slice(0, 400).map((l) => `[${formatOffset(l.offset)}] ${l.text}`).join("\n");
-      const msg = await client.messages.create({
-        model: "claude-sonnet-4-5",
-        max_tokens: 1024,
-        messages: [{
-          role: "user",
-          content: `Title: ${title}\n\nTranscript:\n${plainText}\n\n${STRUCTURED_META_PROMPT}`,
-        }],
-      });
-      const raw = msg.content[0].type === "text" ? msg.content[0].text.trim() : "";
+      const raw = (await chatCompletion({
+        apiKey,
+        user: `Title: ${title}\n\nTranscript:\n${plainText}\n\n${STRUCTURED_META_PROMPT}`,
+        maxTokens: 1024,
+        timeoutMs: 60_000,
+      })).trim();
       const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
       meta = JSON.parse(cleaned) as StructuredMeta;
     } catch (err) {
